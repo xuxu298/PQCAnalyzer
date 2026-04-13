@@ -12,14 +12,12 @@ COPY pyproject.toml .
 COPY src/ src/
 COPY data/ data/
 
-# Install Python dependencies (core + API)
-RUN pip install --no-cache-dir ".[web]"
+# Install Python dependencies (core only)
+RUN pip install --no-cache-dir .
 
 # Create non-root user
 RUN useradd --create-home appuser
 USER appuser
 
-EXPOSE 8000
-
-# Default: run API server
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default: run CLI
+ENTRYPOINT ["pqc-analyzer"]

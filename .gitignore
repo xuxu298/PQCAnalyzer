@@ -43,5 +43,6 @@ redaction_map.json
 
 # Premium modules (available in enterprise branch)
 web/
+src/api/
 src/reporter/
 tests/test_reporter/

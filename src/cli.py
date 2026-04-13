@@ -660,7 +660,9 @@ def generate_roadmap(
     data = json_mod.loads(results_path.read_text())
 
     findings: list[Finding] = []
-    for r in data.get("results", []):
+    # Support both "results" and "scan_results" keys
+    scan_data = data.get("results", data.get("scan_results", []))
+    for r in scan_data:
         for f_data in r.get("findings", []):
             findings.append(Finding(
                 component=f_data["component"],
@@ -777,7 +779,8 @@ def generate_report(
     data = json_mod.loads(results_path.read_text())
 
     findings: list[Finding] = []
-    for r in data.get("results", []):
+    scan_data = data.get("results", data.get("scan_results", []))
+    for r in scan_data:
         for f_data in r.get("findings", []):
             findings.append(Finding(
                 component=f_data["component"],
