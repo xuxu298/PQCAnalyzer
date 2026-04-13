@@ -627,10 +627,230 @@ def _merge_sign_results(sign_results: list, keygen_results: list) -> list:
     return list(merged.values())
 
 
+@app.command("roadmap")
+def generate_roadmap(
+    scan_results: Annotated[str, typer.Argument(help="Path to scan results JSON file")],
+    organization: Annotated[str, typer.Option("--org", help="Organization name")] = "",
+    exposure: Annotated[Optional[int], typer.Option("--exposure", help="Exposure factor (1-3)")] = None,
+    sensitivity: Annotated[Optional[int], typer.Option("--sensitivity", help="Data sensitivity (1-5)")] = None,
+    output: OutputOption = None,
+    language: LanguageOption = "en",
+    verbose: VerboseOption = 0,
+) -> None:
+    """Generate migration roadmap from scan results."""
+    _setup_logging(verbose)
+    set_language(language)  # type: ignore[arg-type]
+
+    from src.roadmap.compliance_checker import check_compliance
+    from src.roadmap.cost_estimator import estimate_cost, format_vnd
+    from src.roadmap.models import MigrationRoadmap
+    from src.roadmap.priority_engine import build_migration_tasks, build_phases
+    from src.roadmap.recommendation import recommend_all
+    from src.roadmap.risk_scorer import score_findings
+    from src.roadmap.timeline_generator import generate_timeline
+    from src.scanner.models import Finding
+
+    # Load scan results
+    results_path = Path(scan_results)
+    if not results_path.exists():
+        console.print(f"[red]File not found: {scan_results}[/red]")
+        raise typer.Exit(1)
+
+    import json as json_mod
+    data = json_mod.loads(results_path.read_text())
+
+    findings: list[Finding] = []
+    for r in data.get("results", []):
+        for f_data in r.get("findings", []):
+            findings.append(Finding(
+                component=f_data["component"],
+                algorithm=f_data["algorithm"],
+                risk_level=RiskLevel(f_data["risk_level"]),
+                quantum_vulnerable=f_data["quantum_vulnerable"],
+                location=f_data.get("location", ""),
+                replacement=f_data.get("replacement", []),
+                migration_priority=f_data.get("migration_priority", 5),
+                note=f_data.get("note", ""),
+            ))
+
+    if not findings:
+        console.print("[red]No findings in scan results.[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Loaded {len(findings)} findings from {scan_results}[/bold]\n")
+
+    # Build roadmap
+    with console.status("Computing risk scores..."):
+        risk_scores = score_findings(findings, exposure, sensitivity)
+    with console.status("Generating recommendations..."):
+        recommendations = recommend_all(findings)
+    with console.status("Building migration plan..."):
+        tasks = build_migration_tasks(findings, risk_scores, recommendations)
+        phases = build_phases(tasks)
+    with console.status("Estimating costs..."):
+        cost = estimate_cost(phases)
+    with console.status("Checking compliance..."):
+        compliance = check_compliance(findings)
+
+    timeline = generate_timeline(phases)
+
+    # Overall risk
+    critical_count = sum(1 for f in findings if f.risk_level == RiskLevel.CRITICAL)
+    high_count = sum(1 for f in findings if f.risk_level == RiskLevel.HIGH)
+    if critical_count > 0:
+        overall = RiskLevel.CRITICAL
+    elif high_count > 0:
+        overall = RiskLevel.HIGH
+    else:
+        overall = RiskLevel.MEDIUM
+
+    roadmap = MigrationRoadmap(
+        organization=organization,
+        overall_risk=overall,
+        phases=phases,
+        risk_scores=risk_scores,
+        cost_estimate=cost,
+        compliance=compliance,
+        total_findings=len(findings),
+        critical_findings=critical_count,
+        quantum_vulnerable_count=sum(1 for f in findings if f.quantum_vulnerable),
+    )
+
+    # Display roadmap
+    console.print(f"[bold]Overall Risk: [{_risk_style(overall)}]{overall.value}[/{_risk_style(overall)}][/bold]")
+    console.print(f"Total findings: {len(findings)} | Critical: {critical_count} | QV: {roadmap.quantum_vulnerable_count}\n")
+
+    for phase in phases:
+        if not phase.tasks:
+            continue
+        console.print(f"[bold cyan]Phase {phase.phase_number} — {phase.name}[/bold cyan] ({phase.timeline})")
+        for task in phase.tasks[:5]:
+            console.print(f"  [{_risk_icon_for_priority(task.priority)}] {task.title} ({task.effort_hours}h)")
+        if len(phase.tasks) > 5:
+            console.print(f"  ... and {len(phase.tasks) - 5} more tasks")
+        console.print(f"  Total effort: {phase.total_effort_hours} person-hours\n")
+
+    # Cost summary
+    console.print("[bold]Cost Estimation:[/bold]")
+    console.print(f"  Total effort: {cost.total_person_hours} person-hours")
+    console.print(f"  Timeline: {cost.timeline_months} months")
+    console.print(f"  Cost range: {format_vnd(cost.cost_range_low_vnd)} — {format_vnd(cost.cost_range_high_vnd)}")
+
+    # Compliance
+    console.print("\n[bold]Compliance:[/bold]")
+    for c in compliance:
+        status_style = {"compliant": "green", "non_compliant": "red", "partial": "yellow"}.get(c.status, "white")
+        console.print(f"  [{status_style}]{c.status.upper()}[/{status_style}] {c.standard}")
+
+    _save_output(roadmap.to_dict(), output)
+
+
+@app.command("report")
+def generate_report(
+    scan_results: Annotated[str, typer.Argument(help="Path to scan results JSON file")],
+    format: Annotated[str, typer.Option("--format", "-f", help="Report format: html, json, sarif")] = "html",
+    organization: Annotated[str, typer.Option("--org", help="Organization name")] = "",
+    prepared_by: Annotated[str, typer.Option("--prepared-by", help="Report author")] = "",
+    output: Annotated[str, typer.Option("--output", "-o", help="Output file path")] = "report.html",
+    language: LanguageOption = "en",
+    verbose: VerboseOption = 0,
+) -> None:
+    """Generate assessment report from scan results."""
+    _setup_logging(verbose)
+    set_language(language)  # type: ignore[arg-type]
+
+    from src.roadmap.compliance_checker import check_compliance
+    from src.roadmap.cost_estimator import estimate_cost
+    from src.roadmap.models import MigrationRoadmap
+    from src.roadmap.priority_engine import build_migration_tasks, build_phases
+    from src.roadmap.recommendation import recommend_all
+    from src.roadmap.risk_scorer import score_findings
+    from src.scanner.models import Finding
+
+    # Load scan results
+    results_path = Path(scan_results)
+    if not results_path.exists():
+        console.print(f"[red]File not found: {scan_results}[/red]")
+        raise typer.Exit(1)
+
+    import json as json_mod
+    data = json_mod.loads(results_path.read_text())
+
+    findings: list[Finding] = []
+    for r in data.get("results", []):
+        for f_data in r.get("findings", []):
+            findings.append(Finding(
+                component=f_data["component"],
+                algorithm=f_data["algorithm"],
+                risk_level=RiskLevel(f_data["risk_level"]),
+                quantum_vulnerable=f_data["quantum_vulnerable"],
+                location=f_data.get("location", ""),
+                replacement=f_data.get("replacement", []),
+                migration_priority=f_data.get("migration_priority", 5),
+                note=f_data.get("note", ""),
+            ))
+
+    if not findings:
+        console.print("[red]No findings in scan results.[/red]")
+        raise typer.Exit(1)
+
+    # Build roadmap
+    with console.status("Building roadmap..."):
+        risk_scores = score_findings(findings)
+        recommendations = recommend_all(findings)
+        tasks = build_migration_tasks(findings, risk_scores, recommendations)
+        phases = build_phases(tasks)
+        cost = estimate_cost(phases)
+        compliance = check_compliance(findings)
+
+    critical_count = sum(1 for f in findings if f.risk_level == RiskLevel.CRITICAL)
+    overall = RiskLevel.CRITICAL if critical_count > 0 else RiskLevel.HIGH
+
+    roadmap = MigrationRoadmap(
+        organization=organization,
+        overall_risk=overall,
+        phases=phases,
+        risk_scores=risk_scores,
+        cost_estimate=cost,
+        compliance=compliance,
+        total_findings=len(findings),
+        critical_findings=critical_count,
+        quantum_vulnerable_count=sum(1 for f in findings if f.quantum_vulnerable),
+    )
+
+    # Generate report
+    if format == "html":
+        from src.reporter.html_report import generate_html_report, save_html_report
+        html = generate_html_report(
+            roadmap=roadmap,
+            findings=findings,
+            language=language,
+            organization=organization,
+            prepared_by=prepared_by,
+        )
+        save_html_report(html, output)
+        console.print(f"[green]HTML report saved to: {output}[/green]")
+    elif format == "json":
+        from src.reporter.json_export import export_json
+        export_json(roadmap, output)
+        console.print(f"[green]JSON report saved to: {output}[/green]")
+    elif format == "sarif":
+        from src.reporter.json_export import export_sarif
+        export_sarif(roadmap, output)
+        console.print(f"[green]SARIF report saved to: {output}[/green]")
+    else:
+        console.print(f"[red]Unknown format: {format}. Use html, json, or sarif.[/red]")
+        raise typer.Exit(1)
+
+
+def _risk_icon_for_priority(priority: int) -> str:
+    return {1: "red", 2: "yellow", 3: "yellow", 4: "green", 5: "cyan"}.get(priority, "white")
+
+
 @app.command("version")
 def version() -> None:
     """Show version information."""
-    console.print("[bold]VN-PQC Readiness Analyzer[/bold] v0.2.0")
+    console.print("[bold]VN-PQC Readiness Analyzer[/bold] v0.3.0")
     console.print("https://github.com/xuxu298/PQCAnalyzer")
 
 
