@@ -3,12 +3,15 @@
 [![CI](https://github.com/xuxu298/PQCAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/xuxu298/PQCAnalyzer/actions)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/xuxu298/PQCAnalyzer?style=social)](https://github.com/xuxu298/PQCAnalyzer)
 
-**Assess your system's readiness for Post-Quantum Cryptography migration.**
+> **NIST has finalized post-quantum standards. Your TLS, SSH, and VPN are running dead algorithms. This tool tells you exactly what to fix, how long it takes, and how much it costs.**
 
-Open-source tool for scanning cryptographic algorithms in your infrastructure, benchmarking PQC performance, and generating actionable migration roadmaps — designed for Vietnam/ASEAN context.
+Scan your infrastructure for quantum-vulnerable cryptography. Get a migration roadmap with cost estimates. NIST FIPS 203/204 compliant.
 
 [Tieng Viet](#tieng-viet) | [English](#features)
+
+![Demo](docs/demo.gif)
 
 ---
 
@@ -35,6 +38,13 @@ For government and enterprise clients, we offer additional modules:
 - **Custom branding** — Tailored report templates and UI for your organization
 
 Contact: **support@vradar.io** for enterprise licensing.
+
+## Why This Tool?
+
+- **Q-Day is coming** — Quantum computers will break RSA, ECDSA, and DH. NIST has finalized replacement standards (FIPS 203/204). The clock is ticking.
+- **No existing open-source tool does the full picture** — scan + benchmark + roadmap + cost estimation + compliance check, all in one CLI.
+- **One command to know where you stand** — `pqc-analyzer scan tls yourdomain.com`
+- **163 tests, offline-first** — works in air-gapped environments and CI/CD pipelines.
 
 ## Quick Start
 
@@ -178,54 +188,54 @@ MIT License. See [LICENSE](LICENSE).
 
 ---
 
-## Tieng Viet
+## Tiếng Việt
 
 # VN-PQC Readiness Analyzer
 
-**Cong cu danh gia muc do san sang chuyen doi mat ma hau luong tu.**
+**Công cụ đánh giá mức độ sẵn sàng chuyển đổi mật mã hậu lượng tử.**
 
-Cong cu ma nguon mo giup quet thuat toan mat ma trong ha tang, benchmark hieu nang PQC, va tao lo trinh chuyen doi — thiet ke cho boi canh Viet Nam/ASEAN.
+Công cụ mã nguồn mở giúp quét thuật toán mật mã trong hạ tầng, benchmark hiệu năng PQC, và tạo lộ trình chuyển đổi — thiết kế cho bối cảnh Việt Nam/ASEAN.
 
-### Phien ban
+### Phiên bản
 
-| | Community (ma nguon mo) | Enterprise (lien he) |
+| | Community (mã nguồn mở) | Enterprise (liên hệ) |
 |---|---|---|
-| Scanner (TLS, SSH, VPN, Code) | Co | Co |
-| Benchmarker (KEM, Signatures) | Co | Co |
-| Roadmap + Chi phi + Tuan thu | Co | Co |
-| CLI | Co | Co |
-| JSON output | Co | Co |
-| **REST API** | - | **Co** |
-| **Web UI (React dashboard)** | - | **Co** |
-| **Bao cao HTML/PDF/SARIF** | - | **Co** |
-| **Tom tat Dieu hanh** | - | **Co** |
-| **Tuy chinh thuong hieu** | - | **Co** |
+| Scanner (TLS, SSH, VPN, Code) | Có | Có |
+| Benchmarker (KEM, Signatures) | Có | Có |
+| Roadmap + Chi phí + Tuân thủ | Có | Có |
+| CLI | Có | Có |
+| JSON output | Có | Có |
+| **REST API** | - | **Có** |
+| **Web UI (React dashboard)** | - | **Có** |
+| **Báo cáo HTML/PDF/SARIF** | - | **Có** |
+| **Tóm tắt Điều hành** | - | **Có** |
+| **Tuỳ chỉnh thương hiệu** | - | **Có** |
 
-### Cai dat nhanh
+### Cài đặt nhanh
 
 ```bash
 pip install -e .
 
-# Quet TLS
+# Quét TLS
 pqc-analyzer scan tls example.vn --port 443
 
-# Tao lo trinh chuyen doi
+# Tạo lộ trình chuyển đổi
 pqc-analyzer roadmap generate --findings ket_qua.json
 
-# Chay benchmark
+# Chạy benchmark
 pqc-analyzer benchmark kem --iterations 1000
 ```
 
-### Doi tuong su dung
+### Đối tượng sử dụng
 
-| Nguoi dung | Nhu cau | Output |
+| Người dùng | Nhu cầu | Output |
 |------------|---------|--------|
-| Ky su IT/vien thong | Biet he thong dung crypto gi, thay bang gi | Danh sach findings + benchmark |
-| Security engineer | Danh gia risk, compliance | Risk matrix + ke hoach xu ly |
-| Policy maker (Ban Co Yeu, Bo TT&TT) | Tong quan ha tang, ngan sach, timeline | JSON (Enterprise: bao cao dieu hanh + Web UI) |
-| Nghien cuu sinh | Reproduce ket qua | Raw data + JSON |
+| Kỹ sư IT/viễn thông | Biết hệ thống dùng crypto gì, thay bằng gì | Danh sách findings + benchmark |
+| Kỹ sư bảo mật | Đánh giá risk, compliance | Risk matrix + kế hoạch xử lý |
+| Nhà làm chính sách quản lý | Tổng quan hạ tầng, ngân sách, timeline | JSON (Enterprise: báo cáo điều hành + Web UI) |
+| Nghiên cứu sinh | Reproduce kết quả | Raw data + JSON |
 
-Lien he **support@vradar.io** de su dung phien ban Enterprise.
+Liên hệ **support@vradar.io** để sử dụng phiên bản Enterprise.
 
 ---
 
