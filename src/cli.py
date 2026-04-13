@@ -300,11 +300,338 @@ def scan_ssh(
     _save_output(inventory.to_dict(), output)
 
 
+@scan_app.command("vpn")
+def scan_vpn(
+    paths: Annotated[list[str], typer.Argument(help="VPN config file paths")],
+    output: OutputOption = None,
+    language: LanguageOption = "en",
+    verbose: VerboseOption = 0,
+) -> None:
+    """Scan VPN configuration files (OpenVPN, WireGuard, IPSec) for quantum-vulnerable algorithms."""
+    _setup_logging(verbose)
+    set_language(language)  # type: ignore[arg-type]
+
+    from src.scanner.inventory import CryptoInventory
+    from src.scanner.vpn_scanner import VPNScanner
+
+    scanner = VPNScanner()
+    inventory = CryptoInventory()
+
+    for path_str in paths:
+        path = Path(path_str)
+        if path.is_dir():
+            # Scan all config files in directory
+            for f in sorted(path.rglob("*")):
+                if f.is_file() and f.suffix in (".conf", ".ovpn", ".cfg"):
+                    result = scanner.scan_file(str(f))
+                    inventory.add_result(result)
+                    if result.findings:
+                        console.print(f"[green]✓ {f}[/green] — {len(result.findings)} finding(s) [{result.metadata.get('vpn_type', '?')}]")
+                    elif result.status.value == "skipped":
+                        console.print(f"[dim]○ {f}[/dim] — skipped (not a VPN config)")
+        elif path.is_file():
+            result = scanner.scan_file(path_str)
+            inventory.add_result(result)
+            if result.status.value != "success":
+                console.print(f"[red]✗ {path_str}: {result.error_message}[/red]")
+            elif result.findings:
+                console.print(f"[green]✓ {path_str}[/green] — {len(result.findings)} finding(s) [{result.metadata.get('vpn_type', '?')}]")
+            else:
+                console.print(f"[dim]○ {path_str}[/dim] — no findings")
+        else:
+            console.print(f"[red]✗ {path_str}: not found[/red]")
+
+    if inventory.all_findings:
+        console.print()
+        _print_findings_table(inventory.all_findings)
+        _print_summary(inventory.summary)
+    else:
+        console.print(f"\n[cyan]{t('no_findings')}[/cyan]")
+
+    _save_output(inventory.to_dict(), output)
+
+
+@scan_app.command("code")
+def scan_code(
+    paths: Annotated[list[str], typer.Argument(help="Source file or directory paths")],
+    recursive: Annotated[bool, typer.Option("--recursive", "-r", help="Scan directories recursively")] = True,
+    output: OutputOption = None,
+    language: LanguageOption = "en",
+    verbose: VerboseOption = 0,
+) -> None:
+    """Scan source code for cryptographic usage patterns."""
+    _setup_logging(verbose)
+    set_language(language)  # type: ignore[arg-type]
+
+    from src.scanner.code_scanner import CodeScanner
+    from src.scanner.inventory import CryptoInventory
+
+    scanner = CodeScanner()
+    inventory = CryptoInventory()
+
+    for path_str in paths:
+        path = Path(path_str)
+        if path.is_dir():
+            results = scanner.scan_directory(str(path), recursive=recursive)
+            inventory.add_results(results)
+            total_findings = sum(len(r.findings) for r in results)
+            console.print(f"[green]Scanned directory: {path_str}[/green] — {len(results)} file(s) with {total_findings} finding(s)")
+        elif path.is_file():
+            result = scanner.scan_file(path_str)
+            inventory.add_result(result)
+            if result.status.value == "skipped":
+                console.print(f"[dim]○ {path_str}[/dim] — {result.error_message}")
+            elif result.findings:
+                console.print(f"[green]✓ {path_str}[/green] — {len(result.findings)} finding(s)")
+            else:
+                console.print(f"[dim]○ {path_str}[/dim] — no findings")
+        else:
+            console.print(f"[red]✗ {path_str}: not found[/red]")
+
+    if inventory.all_findings:
+        console.print()
+        _print_findings_table(inventory.all_findings)
+        _print_summary(inventory.summary)
+    else:
+        console.print(f"\n[cyan]{t('no_findings')}[/cyan]")
+
+    _save_output(inventory.to_dict(), output)
+
+
+# --- Benchmark commands ---
+
+bench_app = typer.Typer(help="Benchmark PQC vs classical cryptographic algorithms.")
+app.add_typer(bench_app, name="benchmark")
+
+
+@bench_app.command("kem")
+def bench_kem(
+    iterations: Annotated[int, typer.Option("--iterations", "-n", help="Number of iterations")] = 1000,
+    warmup: Annotated[int, typer.Option("--warmup", help="Warmup iterations")] = 10,
+    output: OutputOption = None,
+    verbose: VerboseOption = 0,
+) -> None:
+    """Benchmark KEM algorithms (key generation, encapsulation, decapsulation)."""
+    _setup_logging(verbose)
+
+    from src.benchmarker.comparator import compare_kem_results
+    from src.benchmarker.encaps_bench import bench_kem_encaps_classical, bench_kem_encaps_pqc
+    from src.benchmarker.hardware_profile import detect_hardware
+    from src.benchmarker.keygen_bench import bench_kem_keygen_classical, bench_kem_keygen_pqc
+    from src.benchmarker.models import BenchmarkReport
+
+    hw = detect_hardware()
+    console.print(f"[bold]Hardware:[/bold] {hw.cpu_model} ({hw.cpu_cores} cores, {hw.ram_total_gb:.1f} GB RAM)")
+    console.print(f"[bold]Iterations:[/bold] {iterations}\n")
+
+    # Keygen benchmarks
+    with console.status("Benchmarking classical KEM keygen..."):
+        classical_keygen = bench_kem_keygen_classical(iterations, warmup)
+    with console.status("Benchmarking PQC KEM keygen..."):
+        pqc_keygen = bench_kem_keygen_pqc(iterations, warmup)
+
+    # Encaps benchmarks
+    with console.status("Benchmarking classical KEM encaps/decaps..."):
+        classical_encaps = bench_kem_encaps_classical(iterations, warmup)
+    with console.status("Benchmarking PQC KEM encaps/decaps..."):
+        pqc_encaps = bench_kem_encaps_pqc(iterations, warmup)
+
+    # Merge keygen + encaps results
+    all_results = _merge_kem_results(classical_keygen + pqc_keygen, classical_encaps + pqc_encaps)
+
+    # Display results table
+    table = Table(title="KEM Benchmark Results", show_header=True, header_style="bold")
+    table.add_column("Algorithm", width=15)
+    table.add_column("Keygen (ms)", width=12, justify="right")
+    table.add_column("Encaps (ms)", width=12, justify="right")
+    table.add_column("Decaps (ms)", width=12, justify="right")
+    table.add_column("PubKey (B)", width=10, justify="right")
+    table.add_column("CT (B)", width=10, justify="right")
+
+    for r in all_results:
+        table.add_row(
+            r.algorithm,
+            f"{r.keygen.mean:.3f}" if r.keygen.mean > 0 else "—",
+            f"{r.encaps.mean:.3f}" if r.encaps.mean > 0 else "—",
+            f"{r.decaps.mean:.3f}" if r.decaps.mean > 0 else "—",
+            str(r.pubkey_bytes) if r.pubkey_bytes > 0 else "—",
+            str(r.ciphertext_bytes) if r.ciphertext_bytes > 0 else "—",
+        )
+    console.print(table)
+
+    # Comparisons
+    comparisons = compare_kem_results(all_results)
+    if comparisons:
+        console.print("\n[bold]Comparisons:[/bold]")
+        for c in comparisons:
+            console.print(f"  {c.summary}")
+
+    report = BenchmarkReport(hardware=hw, kem_results=all_results, comparisons=comparisons)
+    _save_output(report.to_dict(), output)
+
+
+@bench_app.command("sign")
+def bench_sign(
+    iterations: Annotated[int, typer.Option("--iterations", "-n", help="Number of iterations")] = 1000,
+    warmup: Annotated[int, typer.Option("--warmup", help="Warmup iterations")] = 10,
+    output: OutputOption = None,
+    verbose: VerboseOption = 0,
+) -> None:
+    """Benchmark digital signature algorithms (keygen, sign, verify)."""
+    _setup_logging(verbose)
+
+    from src.benchmarker.comparator import compare_sign_results
+    from src.benchmarker.hardware_profile import detect_hardware
+    from src.benchmarker.keygen_bench import bench_sign_keygen_classical, bench_sign_keygen_pqc
+    from src.benchmarker.models import BenchmarkReport
+    from src.benchmarker.sign_bench import bench_sign_classical, bench_sign_pqc
+
+    hw = detect_hardware()
+    console.print(f"[bold]Hardware:[/bold] {hw.cpu_model} ({hw.cpu_cores} cores, {hw.ram_total_gb:.1f} GB RAM)")
+    console.print(f"[bold]Iterations:[/bold] {iterations}\n")
+
+    # Sign/verify benchmarks (include keygen)
+    with console.status("Benchmarking classical signatures..."):
+        classical_results = bench_sign_classical(iterations, warmup)
+    with console.status("Benchmarking PQC signatures..."):
+        pqc_results = bench_sign_pqc(iterations, warmup)
+
+    # Merge keygen data
+    with console.status("Benchmarking classical sign keygen..."):
+        classical_keygen = bench_sign_keygen_classical(iterations, warmup)
+    with console.status("Benchmarking PQC sign keygen..."):
+        pqc_keygen = bench_sign_keygen_pqc(iterations, warmup)
+
+    all_results = _merge_sign_results(classical_results + pqc_results, classical_keygen + pqc_keygen)
+
+    # Display results table
+    table = Table(title="Signature Benchmark Results", show_header=True, header_style="bold")
+    table.add_column("Algorithm", width=18)
+    table.add_column("Keygen (ms)", width=12, justify="right")
+    table.add_column("Sign (ms)", width=12, justify="right")
+    table.add_column("Verify (ms)", width=12, justify="right")
+    table.add_column("PubKey (B)", width=10, justify="right")
+    table.add_column("Sig (B)", width=10, justify="right")
+
+    for r in all_results:
+        table.add_row(
+            r.algorithm,
+            f"{r.keygen.mean:.3f}" if r.keygen.mean > 0 else "—",
+            f"{r.sign.mean:.3f}" if r.sign.mean > 0 else "—",
+            f"{r.verify.mean:.3f}" if r.verify.mean > 0 else "—",
+            str(r.pubkey_bytes) if r.pubkey_bytes > 0 else "—",
+            str(r.signature_bytes) if r.signature_bytes > 0 else "—",
+        )
+    console.print(table)
+
+    # Comparisons
+    comparisons = compare_sign_results(all_results)
+    if comparisons:
+        console.print("\n[bold]Comparisons:[/bold]")
+        for c in comparisons:
+            console.print(f"  {c.summary}")
+
+    report = BenchmarkReport(hardware=hw, sign_results=all_results, comparisons=comparisons)
+    _save_output(report.to_dict(), output)
+
+
+@bench_app.command("all")
+def bench_all(
+    iterations: Annotated[int, typer.Option("--iterations", "-n", help="Number of iterations")] = 1000,
+    warmup: Annotated[int, typer.Option("--warmup", help="Warmup iterations")] = 10,
+    output: OutputOption = None,
+    verbose: VerboseOption = 0,
+) -> None:
+    """Run all benchmarks (KEM + signatures)."""
+    _setup_logging(verbose)
+    console.print("[bold]Running full benchmark suite...[/bold]\n")
+    bench_kem(iterations=iterations, warmup=warmup, output=None, verbose=verbose)
+    console.print()
+    bench_sign(iterations=iterations, warmup=warmup, output=None, verbose=verbose)
+
+    if output:
+        console.print(f"\n[green]Note: Use 'benchmark kem -o' or 'benchmark sign -o' to save individual results.[/green]")
+
+
+@bench_app.command("hardware")
+def bench_hardware() -> None:
+    """Show detected hardware profile."""
+    from src.benchmarker.hardware_profile import detect_hardware
+
+    hw = detect_hardware()
+    table = Table(title="Hardware Profile", show_header=False)
+    table.add_column("Property", style="bold", width=20)
+    table.add_column("Value", width=50)
+
+    table.add_row("CPU", hw.cpu_model)
+    table.add_row("Architecture", hw.cpu_arch)
+    table.add_row("Cores/Threads", f"{hw.cpu_cores}/{hw.cpu_threads}")
+    table.add_row("Frequency", f"{hw.cpu_frequency_mhz:.0f} MHz")
+    table.add_row("RAM", f"{hw.ram_total_gb:.1f} GB")
+    table.add_row("OS", f"{hw.os_name} {hw.os_version}")
+    table.add_row("Python", hw.python_version)
+    table.add_row("OpenSSL", hw.openssl_version)
+    table.add_row("liboqs", hw.liboqs_version)
+    table.add_row("AES-NI", "[green]Yes[/green]" if hw.has_aesni else "[red]No[/red]")
+    table.add_row("AVX2", "[green]Yes[/green]" if hw.has_avx2 else "[red]No[/red]")
+    table.add_row("AVX-512", "[green]Yes[/green]" if hw.has_avx512 else "[red]No[/red]")
+    table.add_row("SHA Extensions", "[green]Yes[/green]" if hw.has_sha_ext else "[red]No[/red]")
+
+    console.print(table)
+
+
+def _merge_kem_results(
+    keygen_results: list, encaps_results: list,
+) -> list:
+    """Merge keygen and encaps results for the same algorithm."""
+    from src.benchmarker.models import KEMBenchmarkResult
+    merged: dict[str, KEMBenchmarkResult] = {}
+
+    for r in keygen_results:
+        merged[r.algorithm] = KEMBenchmarkResult(
+            algorithm=r.algorithm,
+            iterations=r.iterations,
+            keygen=r.keygen,
+            pubkey_bytes=r.pubkey_bytes,
+            seckey_bytes=r.seckey_bytes,
+        )
+
+    for r in encaps_results:
+        if r.algorithm in merged:
+            merged[r.algorithm].encaps = r.encaps
+            merged[r.algorithm].decaps = r.decaps
+            merged[r.algorithm].ciphertext_bytes = r.ciphertext_bytes
+        else:
+            merged[r.algorithm] = r
+
+    return list(merged.values())
+
+
+def _merge_sign_results(sign_results: list, keygen_results: list) -> list:
+    """Merge sign/verify and keygen results for the same algorithm."""
+    merged: dict[str, object] = {}
+
+    for r in sign_results:
+        merged[r.algorithm] = r
+
+    for r in keygen_results:
+        name = r.algorithm.replace("-Sign", "")
+        if name in merged:
+            merged[name].keygen = r.keygen
+            if not merged[name].pubkey_bytes and r.pubkey_bytes:
+                merged[name].pubkey_bytes = r.pubkey_bytes
+                merged[name].seckey_bytes = r.seckey_bytes
+        elif r.algorithm in merged:
+            merged[r.algorithm].keygen = r.keygen
+
+    return list(merged.values())
+
+
 @app.command("version")
 def version() -> None:
     """Show version information."""
-    console.print("[bold]VN-PQC Readiness Analyzer[/bold] v0.1.0")
-    console.print("https://github.com/nguyendong/vn-pqc-analyzer")
+    console.print("[bold]VN-PQC Readiness Analyzer[/bold] v0.2.0")
+    console.print("https://github.com/xuxu298/PQCAnalyzer")
 
 
 @app.command("db")
