@@ -1,0 +1,101 @@
+{
+  "version": "2026-04",
+  "source": "NIST Post-Quantum Cryptography Standardization",
+  "standards": [
+    {
+      "id": "FIPS-203",
+      "name": "ML-KEM (Module-Lattice-Based Key-Encapsulation Mechanism)",
+      "status": "Final Standard (August 2024)",
+      "algorithms": ["ML-KEM-512", "ML-KEM-768", "ML-KEM-1024"],
+      "replaces": ["RSA-KEM", "ECDH", "DH", "X25519"],
+      "category": "kem",
+      "security_levels": {
+        "ML-KEM-512": 1,
+        "ML-KEM-768": 3,
+        "ML-KEM-1024": 5
+      },
+      "recommended_default": "ML-KEM-768",
+      "notes": "Primary KEM standard. ML-KEM-768 recommended for most applications."
+    },
+    {
+      "id": "FIPS-204",
+      "name": "ML-DSA (Module-Lattice-Based Digital Signature Algorithm)",
+      "status": "Final Standard (August 2024)",
+      "algorithms": ["ML-DSA-44", "ML-DSA-65", "ML-DSA-87"],
+      "replaces": ["RSA-Sign", "ECDSA", "Ed25519", "DSA"],
+      "category": "signature",
+      "security_levels": {
+        "ML-DSA-44": 2,
+        "ML-DSA-65": 3,
+        "ML-DSA-87": 5
+      },
+      "recommended_default": "ML-DSA-65",
+      "notes": "Primary signature standard. ML-DSA-65 recommended for most applications."
+    },
+    {
+      "id": "FIPS-205",
+      "name": "SLH-DSA (Stateless Hash-Based Digital Signature Algorithm)",
+      "status": "Final Standard (August 2024)",
+      "algorithms": [
+        "SLH-DSA-SHA2-128s", "SLH-DSA-SHA2-128f",
+        "SLH-DSA-SHA2-192s", "SLH-DSA-SHA2-192f",
+        "SLH-DSA-SHA2-256s", "SLH-DSA-SHA2-256f",
+        "SLH-DSA-SHAKE-128s", "SLH-DSA-SHAKE-128f",
+        "SLH-DSA-SHAKE-192s", "SLH-DSA-SHAKE-192f",
+        "SLH-DSA-SHAKE-256s", "SLH-DSA-SHAKE-256f"
+      ],
+      "replaces": ["RSA-Sign", "ECDSA"],
+      "category": "signature",
+      "notes": "Hash-based signatures. Conservative choice with well-understood security. Larger signatures than ML-DSA."
+    },
+    {
+      "id": "FIPS-206-draft",
+      "name": "FN-DSA (FFT over NTRU-Lattice-Based Digital Signature Algorithm)",
+      "status": "Draft Standard (expected 2025)",
+      "algorithms": ["FN-DSA-512", "FN-DSA-1024"],
+      "replaces": ["RSA-Sign", "ECDSA"],
+      "category": "signature",
+      "notes": "Compact signatures. Based on FALCON. Not yet finalized."
+    }
+  ],
+  "transition_guidelines": [
+    {
+      "id": "SP-800-131A-Rev2",
+      "name": "Transitioning the Use of Cryptographic Algorithms and Key Lengths",
+      "key_requirements": [
+        "SHA-1 disallowed for digital signatures",
+        "RSA key length minimum 2048 bits",
+        "3DES deprecated after 2023",
+        "112-bit security minimum for all symmetric operations"
+      ]
+    },
+    {
+      "id": "SP-800-57-Part1-Rev5",
+      "name": "Recommendation for Key Management",
+      "key_requirements": [
+        "AES-128: acceptable (128-bit security, Grover reduces to 64-bit quantum)",
+        "AES-256: recommended (256-bit security, Grover reduces to 128-bit quantum)",
+        "RSA-2048: 112-bit classical, quantum vulnerable (Shor)",
+        "ECDSA-P256: 128-bit classical, quantum vulnerable (Shor)"
+      ]
+    },
+    {
+      "id": "CNSA-2.0",
+      "name": "NSA Commercial National Security Algorithm Suite 2.0",
+      "deadline": "2033",
+      "requirements": [
+        "ML-KEM-1024 for key establishment (by 2033)",
+        "ML-DSA-87 for digital signatures (by 2033)",
+        "AES-256 for symmetric encryption",
+        "SHA-384 minimum for hashing",
+        "XMSS/LMS for firmware signing"
+      ]
+    }
+  ],
+  "quantum_threat_timeline": {
+    "harvest_now_decrypt_later": "Active threat — adversaries collecting encrypted traffic today",
+    "cryptanalytically_relevant_quantum_computer": "Estimated 2030-2040",
+    "nist_recommendation": "Begin PQC migration immediately",
+    "us_government_deadline": "2035 — all systems must be quantum-resistant"
+  }
+}

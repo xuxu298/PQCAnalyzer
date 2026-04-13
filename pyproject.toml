@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vn-pqc-analyzer"
-version = "0.1.0"
+version = "0.3.0"
 description = "Assess your system's readiness for post-quantum cryptography migration"
-# readme = "README.md"  # Uncomment when README.md exists
+readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
@@ -29,6 +29,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -74,20 +75,20 @@ all = [
 pqc-analyzer = "src.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/nguyendong/vn-pqc-analyzer"
-Documentation = "https://github.com/nguyendong/vn-pqc-analyzer/docs"
-Repository = "https://github.com/nguyendong/vn-pqc-analyzer"
-Issues = "https://github.com/nguyendong/vn-pqc-analyzer/issues"
+Homepage = "https://github.com/xuxu298/PQCAnalyzer"
+Documentation = "https://github.com/xuxu298/PQCAnalyzer/tree/main/docs"
+Repository = "https://github.com/xuxu298/PQCAnalyzer"
+Issues = "https://github.com/xuxu298/PQCAnalyzer/issues"
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "TCH"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

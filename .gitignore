@@ -34,6 +34,7 @@ Thumbs.db
 results/
 reports/
 scan-results/
+output/
 redaction_map.json
 
 # Environment
