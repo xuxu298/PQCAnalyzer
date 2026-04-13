@@ -1,0 +1,35 @@
+name: Bug Report
+description: Report a bug in VN-PQC Analyzer
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened? What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Commands or steps to reproduce the bug
+      placeholder: |
+        1. Run `pqc-analyzer scan tls ...`
+        2. See error...
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, package version
+      placeholder: |
+        - OS: Ubuntu 22.04
+        - Python: 3.11.5
+        - vn-pqc-analyzer: 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Error Output
+      render: shell

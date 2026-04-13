@@ -1,0 +1,16 @@
+# Weak SSH configuration for testing
+Port 22
+Protocol 2
+
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_dsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+KexAlgorithms diffie-hellman-group1-sha1,diffie-hellman-group14-sha1,ecdh-sha2-nistp256,curve25519-sha256
+HostKeyAlgorithms ssh-rsa,ssh-dss,ecdsa-sha2-nistp256,ssh-ed25519
+Ciphers 3des-cbc,aes128-cbc,aes256-ctr,aes128-gcm@openssh.com,chacha20-poly1305@openssh.com
+MACs hmac-md5,hmac-sha1,hmac-sha2-256,hmac-sha2-512
+
+PermitRootLogin no
+PubkeyAuthentication yes
