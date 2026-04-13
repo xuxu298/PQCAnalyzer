@@ -819,27 +819,32 @@ def generate_report(
     )
 
     # Generate report
-    if format == "html":
-        from src.reporter.html_report import generate_html_report, save_html_report
-        html = generate_html_report(
-            roadmap=roadmap,
-            findings=findings,
-            language=language,
-            organization=organization,
-            prepared_by=prepared_by,
-        )
-        save_html_report(html, output)
-        console.print(f"[green]HTML report saved to: {output}[/green]")
-    elif format == "json":
-        from src.reporter.json_export import export_json
-        export_json(roadmap, output)
-        console.print(f"[green]JSON report saved to: {output}[/green]")
-    elif format == "sarif":
-        from src.reporter.json_export import export_sarif
-        export_sarif(roadmap, output)
-        console.print(f"[green]SARIF report saved to: {output}[/green]")
-    else:
-        console.print(f"[red]Unknown format: {format}. Use html, json, or sarif.[/red]")
+    try:
+        if format == "html":
+            from src.reporter.html_report import generate_html_report, save_html_report
+            html = generate_html_report(
+                roadmap=roadmap,
+                findings=findings,
+                language=language,
+                organization=organization,
+                prepared_by=prepared_by,
+            )
+            save_html_report(html, output)
+            console.print(f"[green]HTML report saved to: {output}[/green]")
+        elif format == "json":
+            from src.reporter.json_export import export_json
+            export_json(roadmap, output)
+            console.print(f"[green]JSON report saved to: {output}[/green]")
+        elif format == "sarif":
+            from src.reporter.json_export import export_sarif
+            export_sarif(roadmap, output)
+            console.print(f"[green]SARIF report saved to: {output}[/green]")
+        else:
+            console.print(f"[red]Unknown format: {format}. Use html, json, or sarif.[/red]")
+            raise typer.Exit(1)
+    except ImportError:
+        console.print("[red]Reporter module not available in this deployment.[/red]")
+        console.print("Install with: pip install -e '.[report]' or contact your administrator.")
         raise typer.Exit(1)
 
 

@@ -37,14 +37,22 @@ web/              <-- React frontend (independent, optional)
 
 ## Key Design Decisions
 
-### 1. Web Frontend Separation
+### 1. Web Frontend & Reporter Separation
 
-The `web/` directory is fully self-contained:
+The `web/` and `src/reporter/` directories are designed to be replaceable:
+
+**Web frontend (`web/`):**
 - Has its own `package.json`, build pipeline, and dependencies
 - Communicates with backend only via REST API (`/api/*`)
 - No Python code imports from `web/`
-- Can be excluded via `.gitignore.govt` for government deployments
 - Docker Compose uses `profiles` — `web` profile is optional
+
+**Reporter (`src/reporter/`):**
+- All imports from reporter are lazy (inside function bodies)
+- CLI and API catch `ImportError` and return clear error messages
+- Government clients can replace with custom report templates
+
+**To exclude both:** `cp .gitignore.govt .gitignore`
 
 ### 2. Risk Scoring Formula
 

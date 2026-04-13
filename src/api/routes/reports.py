@@ -27,7 +27,14 @@ def generate_report(request: ReportRequest):
 @router.post("/report/html", response_class=HTMLResponse)
 def generate_html(request: ReportRequest):
     """Generate HTML report from scan results."""
-    from src.reporter.html_report import generate_html_report
+    try:
+        from src.reporter.html_report import generate_html_report
+    except ImportError:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=501,
+            detail="Reporter module not installed. This deployment does not include report generation.",
+        )
     from src.roadmap.models import MigrationRoadmap
 
     # Create minimal roadmap for report

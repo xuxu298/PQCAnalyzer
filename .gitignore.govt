@@ -1,10 +1,16 @@
 # .gitignore for Government/Enterprise deployments
-# Copy this file as .gitignore to exclude the default web frontend.
-# This allows deploying only the Python backend + API, with a custom
-# frontend provided separately.
+# Copy this file as .gitignore to exclude the default web frontend
+# and report generator. This allows deploying only the Python backend + API,
+# with custom frontend and report templates provided separately.
+#
+# Usage: cp .gitignore.govt .gitignore
 
 # Default web frontend (replace with custom frontend)
 web/
+
+# Default report generator (replace with custom report templates)
+src/reporter/
+tests/test_reporter/
 
 # Standard Python ignores
 __pycache__/

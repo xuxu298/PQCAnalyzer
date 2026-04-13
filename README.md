@@ -108,14 +108,14 @@ tests/              # 171+ tests
 
 ### Modular Design
 
-The web frontend (`web/`) is fully self-contained and independent from the Python backend. For government/enterprise deployments that require a custom frontend:
+The web frontend (`web/`) and report generator (`src/reporter/`) are fully self-contained and independent. For government/enterprise deployments that require custom frontend or report templates:
 
 ```bash
-# Add web/ to .gitignore for custom frontend deployments
-echo "web/" >> .gitignore
+# Use the government gitignore template (excludes web/ and src/reporter/)
+cp .gitignore.govt .gitignore
 ```
 
-See [`.gitignore.govt`](.gitignore.govt) for a ready-to-use template.
+The CLI and API gracefully handle missing reporter — they return a clear error message instead of crashing. See [`.gitignore.govt`](.gitignore.govt) for a ready-to-use template.
 
 ## Scan Targets
 
