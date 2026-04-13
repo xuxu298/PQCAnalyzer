@@ -85,7 +85,7 @@ pqc-analyzer scan code /path/to/project/src
 pqc-analyzer scan config /etc/nginx/nginx.conf
 
 # Generate migration roadmap
-pqc-analyzer roadmap generate --findings scan_results.json
+pqc-analyzer roadmap scan_results.json
 
 # Run PQC benchmark
 pqc-analyzer benchmark kem --iterations 1000
@@ -220,7 +220,7 @@ pip install -e .
 pqc-analyzer scan tls example.vn --port 443
 
 # Tạo lộ trình chuyển đổi
-pqc-analyzer roadmap generate --findings ket_qua.json
+pqc-analyzer roadmap ket_qua.json
 
 # Chạy benchmark
 pqc-analyzer benchmark kem --iterations 1000
