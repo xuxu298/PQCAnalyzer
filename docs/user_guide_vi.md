@@ -15,18 +15,10 @@ cd PQCAnalyzer
 pip install -e .
 ```
 
-### Cai dat day du
-
-```bash
-pip install -e ".[all]"
-```
-
 ### Phu thuoc tuy chon
 
 ```bash
 pip install -e ".[dev]"        # Cong cu phat trien (pytest, ruff, mypy)
-pip install -e ".[web]"        # FastAPI backend
-pip install -e ".[report]"     # Bao cao PDF (WeasyPrint)
 pip install -e ".[benchmark]"  # Benchmark PQC (liboqs)
 ```
 
@@ -78,48 +70,11 @@ pqc-analyzer roadmap generate --findings ketqua.json --org "Cong ty ABC"
 pqc-analyzer roadmap generate --findings ketqua.json --language vi
 ```
 
-### Tao bao cao
+### Docker
 
 ```bash
-# Bao cao HTML
-pqc-analyzer report html --findings ketqua.json -o baocao.html
-
-# Xuat JSON
-pqc-analyzer report json --findings ketqua.json -o baocao.json
-
-# SARIF cho CI/CD
-pqc-analyzer report sarif --findings ketqua.json -o baocao.sarif
-
-# Tom tat dieu hanh
-pqc-analyzer report summary --findings ketqua.json --language vi
-```
-
-## API Server
-
-```bash
-# Khoi dong server
-uvicorn src.api.main:app --reload --port 8000
-
-# Tai lieu API tai http://localhost:8000/docs
-```
-
-## Giao dien Web
-
-```bash
-cd web
-npm install
-npm run dev
-# Mo http://localhost:5173
-```
-
-## Docker
-
-```bash
-# Chi API
-docker compose up
-
-# API + Giao dien Web
-docker compose --profile web up
+docker build -t pqc-analyzer .
+docker run pqc-analyzer scan tls example.vn
 ```
 
 ## Hieu ket qua
@@ -148,8 +103,9 @@ docker compose --profile web up
 **"ModuleNotFoundError: No module named 'liboqs'"**
 Cai dat: `pip install -e ".[benchmark]"`
 
-**"Connection refused" khi goi API**
-Dam bao API dang chay: `uvicorn src.api.main:app --port 8000`
-
 **"WeasyPrint not found"**
-Cai dat: `pip install -e ".[report]"` va `apt install libpango-1.0-0 libharfbuzz0b`
+Tinh nang bao cao co trong phien ban Enterprise. Lien he support@vradar.io.
+
+---
+
+**Phat trien boi:** [Nguyen Dong](https://www.linkedin.com/in/dongnx/) — Founder of [vradar.io](https://vradar.io)

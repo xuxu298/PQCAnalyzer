@@ -24,15 +24,7 @@ src/
     |               (risk_scorer -> recommendation -> priority_engine
     |                -> cost_estimator -> timeline -> compliance)
     |
-  reporter/       <-- Output: Reports
-    |               (html, json, sarif, pdf, executive_summary)
-    |
-  api/            <-- FastAPI REST backend
-    |               (routes: scanner, benchmarker, roadmap, reports)
-    |
   cli.py          <-- CLI entry point (typer)
-
-web/              <-- React frontend (independent, optional)
 ```
 
 ## Key Design Decisions
@@ -42,12 +34,13 @@ web/              <-- React frontend (independent, optional)
 The project follows a dual-edition model:
 
 **Community Edition** (`main` branch — open source):
-- Scanner, benchmarker, roadmap, CLI, API
+- Scanner, benchmarker, roadmap, CLI
 - JSON output for all data
-- No web UI, no report generator
+- No API server, no web UI, no report generator
 
 **Enterprise Edition** (`enterprise` branch — licensed):
 - Everything in Community, plus:
+- `src/api/` — FastAPI REST backend
 - `web/` — React frontend with dashboard, charts, bilingual UI
 - `src/reporter/` — HTML, PDF, SARIF, Executive Summary reports
 - Docker Compose with web profile
@@ -55,7 +48,7 @@ The project follows a dual-edition model:
 
 **Technical design for separation:**
 - All imports from `src/reporter/` are lazy (inside function bodies)
-- CLI and API catch `ImportError` and return clear error messages
+- CLI catches `ImportError` and returns clear error messages
 - `web/` communicates with backend only via REST API
 - No Python code imports from `web/`
 
@@ -92,27 +85,10 @@ The `crypto_db.py` fuzzy classifier matches algorithm strings from various forma
 
 ### 5. Offline-First Testing
 
-All 171+ tests run offline (no network, no liboqs required):
+All 163+ tests run offline (no network, no liboqs required):
 - Scanner tests use fixture config files
 - Benchmark tests mock liboqs when unavailable
 - Integration tests (network, real TLS) marked with `@pytest.mark.integration`
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| POST | `/scan/config` | Scan config file |
-| POST | `/scan/ssh` | Scan SSH config |
-| POST | `/scan/vpn` | Scan VPN config |
-| POST | `/scan/code` | Scan source code |
-| GET | `/benchmark/hardware` | Get hardware info |
-| POST | `/benchmark/kem` | Run KEM benchmark |
-| POST | `/benchmark/sign` | Run signature benchmark |
-| POST | `/roadmap/generate` | Generate migration roadmap |
-| POST | `/report/generate` | Generate report |
-| POST | `/report/html` | Generate HTML report |
-| GET | `/report/formats` | List report formats |
 
 ## Data Flow
 
@@ -122,4 +98,8 @@ All 171+ tests run offline (no network, no liboqs required):
 4. **Priority Engine** assigns phases and builds `MigrationTask` list
 5. **Cost Estimator** calculates person-hours and VND costs
 6. **Compliance Checker** evaluates against NIST/Vietnam standards
-7. **Reporter** formats everything into HTML/JSON/SARIF/PDF output
+7. **CLI** outputs results as rich terminal tables or JSON files
+
+---
+
+**Developed by:** [Nguyen Dong](https://www.linkedin.com/in/dongnx/) — Founder of [vradar.io](https://vradar.io)

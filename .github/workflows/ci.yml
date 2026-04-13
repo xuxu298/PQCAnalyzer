@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e ".[dev,web]"
+      - run: pip install -e ".[dev]"
       - run: pytest --cov=src --cov-report=xml -v -m "not integration" --ignore=tests/test_reporter
       - uses: codecov/codecov-action@v4
         if: matrix.python-version == '3.11'

@@ -20,28 +20,40 @@ Open-source tool for scanning cryptographic algorithms in your infrastructure, b
 - **PQC Benchmarker** — Compare classical vs PQC algorithms (ML-KEM, ML-DSA) on your hardware
 - **Migration Roadmap** — Risk scoring, priority engine, 4-phase migration plan with cost estimation
 - **Compliance Checker** — NIST FIPS 203/204, SP 800-131A, Vietnam Ban Co Yeu guidelines
-- **REST API** — FastAPI backend for integration
 - **CLI** — Full command-line interface with rich output
 - **Bilingual** — Vietnamese/English support
-- **JSON output** — Roadmap exported as structured JSON
+- **JSON output** — Scan results and roadmaps exported as structured JSON
 
 ### Enterprise Edition
 
 For government and enterprise clients, we offer additional modules:
 
+- **REST API** — FastAPI backend for integration
 - **Web UI** — React dashboard with interactive charts, risk heatmaps, benchmark visualizations
 - **Report Generator** — HTML (dark theme), PDF (WeasyPrint), SARIF (CI/CD), Executive Summary
 - **Docker Compose** — Multi-service deployment with web frontend
 - **Custom branding** — Tailored report templates and UI for your organization
 
-Contact: **dong@example.com** for enterprise licensing.
+Contact: **support@vradar.io** for enterprise licensing.
 
 ## Quick Start
 
 ### Install
 
 ```bash
-pip install -e ".[dev,web]"
+pip install -e .
+```
+
+With development tools:
+
+```bash
+pip install -e ".[dev]"
+```
+
+With PQC benchmark support (requires liboqs):
+
+```bash
+pip install -e ".[benchmark]"
 ```
 
 ### CLI Usage
@@ -62,28 +74,22 @@ pqc-analyzer scan code /path/to/project/src
 # Scan config files (nginx, apache, haproxy)
 pqc-analyzer scan config /etc/nginx/nginx.conf
 
-# Generate migration roadmap (output: JSON + terminal summary)
+# Generate migration roadmap
 pqc-analyzer roadmap generate --findings scan_results.json
 
 # Run PQC benchmark
 pqc-analyzer benchmark kem --iterations 1000
 pqc-analyzer benchmark sign --iterations 1000
-```
 
-### API Server
-
-```bash
-# Start the API
-uvicorn src.api.main:app --reload
-
-# API docs at http://localhost:8000/docs
+# Export results as JSON
+pqc-analyzer scan tls example.com -o results.json
 ```
 
 ### Docker
 
 ```bash
 docker build -t pqc-analyzer .
-docker run -p 8000:8000 pqc-analyzer
+docker run pqc-analyzer scan tls example.com
 ```
 
 ## Architecture
@@ -93,8 +99,8 @@ src/
   scanner/          # Crypto inventory scanner (TLS, cert, SSH, VPN, code)
   benchmarker/      # PQC performance benchmarker (KEM, signatures)
   roadmap/          # Migration roadmap (risk, recommendation, priority, cost)
-  api/              # FastAPI REST backend
   utils/            # Shared utilities (crypto DB, i18n, constants)
+  cli.py            # CLI entry point (typer)
 
 data/               # Algorithm database, NIST/Vietnam guidelines
 examples/           # Demo scripts
@@ -142,7 +148,7 @@ Compliance:
 
 ### JSON Export
 
-All scan results and roadmaps export as structured JSON via CLI (`-o output.json`) or API.
+All scan results and roadmaps export as structured JSON via CLI (`-o output.json`).
 
 ## Risk Levels
 
@@ -187,8 +193,9 @@ Cong cu ma nguon mo giup quet thuat toan mat ma trong ha tang, benchmark hieu na
 | Scanner (TLS, SSH, VPN, Code) | Co | Co |
 | Benchmarker (KEM, Signatures) | Co | Co |
 | Roadmap + Chi phi + Tuan thu | Co | Co |
-| CLI + API | Co | Co |
+| CLI | Co | Co |
 | JSON output | Co | Co |
+| **REST API** | - | **Co** |
 | **Web UI (React dashboard)** | - | **Co** |
 | **Bao cao HTML/PDF/SARIF** | - | **Co** |
 | **Tom tat Dieu hanh** | - | **Co** |
@@ -197,7 +204,7 @@ Cong cu ma nguon mo giup quet thuat toan mat ma trong ha tang, benchmark hieu na
 ### Cai dat nhanh
 
 ```bash
-pip install -e ".[dev,web]"
+pip install -e .
 
 # Quet TLS
 pqc-analyzer scan tls example.vn --port 443
@@ -215,11 +222,11 @@ pqc-analyzer benchmark kem --iterations 1000
 |------------|---------|--------|
 | Ky su IT/vien thong | Biet he thong dung crypto gi, thay bang gi | Danh sach findings + benchmark |
 | Security engineer | Danh gia risk, compliance | Risk matrix + ke hoach xu ly |
-| Policy maker (Ban Co Yeu, Bo TT&TT) | Tong quan ha tang, ngan sach, timeline | JSON + API (Enterprise: bao cao dieu hanh) |
-| Nghien cuu sinh | Reproduce ket qua | Raw data + API |
+| Policy maker (Ban Co Yeu, Bo TT&TT) | Tong quan ha tang, ngan sach, timeline | JSON (Enterprise: bao cao dieu hanh + Web UI) |
+| Nghien cuu sinh | Reproduce ket qua | Raw data + JSON |
 
-Lien he **dong@example.com** de su dung phien ban Enterprise.
+Lien he **support@vradar.io** de su dung phien ban Enterprise.
 
 ---
 
-**Author:** Nguyen Dong | **License:** MIT
+**Developed by:** [Nguyen Dong](https://www.linkedin.com/in/dongnx/) — Founder of [vradar.io](https://vradar.io) | **License:** MIT
