@@ -41,6 +41,7 @@ redaction_map.json
 .env
 .env.local
 
-# Node (web frontend)
-web/node_modules/
-web/dist/
+# Premium modules (available in enterprise branch)
+web/
+src/reporter/
+tests/test_reporter/

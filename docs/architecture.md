@@ -37,22 +37,27 @@ web/              <-- React frontend (independent, optional)
 
 ## Key Design Decisions
 
-### 1. Web Frontend & Reporter Separation
+### 1. Community / Enterprise Separation
 
-The `web/` and `src/reporter/` directories are designed to be replaceable:
+The project follows a dual-edition model:
 
-**Web frontend (`web/`):**
-- Has its own `package.json`, build pipeline, and dependencies
-- Communicates with backend only via REST API (`/api/*`)
-- No Python code imports from `web/`
-- Docker Compose uses `profiles` — `web` profile is optional
+**Community Edition** (`main` branch — open source):
+- Scanner, benchmarker, roadmap, CLI, API
+- JSON output for all data
+- No web UI, no report generator
 
-**Reporter (`src/reporter/`):**
-- All imports from reporter are lazy (inside function bodies)
+**Enterprise Edition** (`enterprise` branch — licensed):
+- Everything in Community, plus:
+- `web/` — React frontend with dashboard, charts, bilingual UI
+- `src/reporter/` — HTML, PDF, SARIF, Executive Summary reports
+- Docker Compose with web profile
+- Custom branding support
+
+**Technical design for separation:**
+- All imports from `src/reporter/` are lazy (inside function bodies)
 - CLI and API catch `ImportError` and return clear error messages
-- Government clients can replace with custom report templates
-
-**To exclude both:** `cp .gitignore.govt .gitignore`
+- `web/` communicates with backend only via REST API
+- No Python code imports from `web/`
 
 ### 2. Risk Scoring Formula
 
