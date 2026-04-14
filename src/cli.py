@@ -10,6 +10,7 @@ from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from src.config import ScanConfig
@@ -404,6 +405,30 @@ bench_app = typer.Typer(help="Benchmark PQC vs classical cryptographic algorithm
 app.add_typer(bench_app, name="benchmark")
 
 
+def _check_liboqs_available() -> bool:
+    """Check for liboqs-python and print an actionable notice if missing.
+
+    Returns True if liboqs is importable, False otherwise. When missing,
+    prints a prominent panel pointing users at the install command so the
+    classical-only benchmark output doesn't look like the tool is broken.
+    """
+    try:
+        import oqs  # noqa: F401
+        return True
+    except ImportError:
+        console.print(Panel(
+            "[yellow]liboqs-python is not installed — PQC benchmarks will be skipped.[/yellow]\n"
+            "Only classical algorithms (RSA, ECDH, ECDSA) will be measured.\n\n"
+            "[bold]To enable PQC benchmarks (ML-KEM, ML-DSA):[/bold]\n"
+            "  [cyan]pip install -e \".\\[benchmark]\"[/cyan]\n\n"
+            "This installs liboqs-python, which compiles liboqs C library.\n"
+            "Requires: cmake, a C compiler. See https://github.com/open-quantum-safe/liboqs-python",
+            title="[bold]PQC benchmarks unavailable[/bold]",
+            border_style="yellow",
+        ))
+        return False
+
+
 @bench_app.command("kem")
 def bench_kem(
     iterations: Annotated[int, typer.Option("--iterations", "-n", help="Number of iterations")] = 1000,
@@ -423,6 +448,8 @@ def bench_kem(
     hw = detect_hardware()
     console.print(f"[bold]Hardware:[/bold] {hw.cpu_model} ({hw.cpu_cores} cores, {hw.ram_total_gb:.1f} GB RAM)")
     console.print(f"[bold]Iterations:[/bold] {iterations}\n")
+
+    _check_liboqs_available()
 
     # Keygen benchmarks
     with console.status("Benchmarking classical KEM keygen..."):
@@ -489,6 +516,8 @@ def bench_sign(
     hw = detect_hardware()
     console.print(f"[bold]Hardware:[/bold] {hw.cpu_model} ({hw.cpu_cores} cores, {hw.ram_total_gb:.1f} GB RAM)")
     console.print(f"[bold]Iterations:[/bold] {iterations}\n")
+
+    _check_liboqs_available()
 
     # Sign/verify benchmarks (include keygen)
     with console.status("Benchmarking classical signatures..."):

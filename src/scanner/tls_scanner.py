@@ -93,8 +93,16 @@ class TLSScanner:
                     info.cipher_suite = cipher[0]
                     info.protocol_version = info.protocol_version or cipher[1]
 
+                # Try to get negotiated KEX group (Python 3.13+: SSLSocket.group())
+                negotiated_group = None
+                if hasattr(ssock, "group"):
+                    try:
+                        negotiated_group = ssock.group()
+                    except Exception:
+                        negotiated_group = None
+
                 # Parse cipher suite components
-                self._parse_cipher_suite(info)
+                self._parse_cipher_suite(info, negotiated_group)
 
                 # Get certificate chain
                 cert_bin = ssock.getpeercert(binary_form=True)
@@ -107,17 +115,37 @@ class TLSScanner:
 
         return info
 
-    def _parse_cipher_suite(self, info: TLSConnectionInfo) -> None:
-        """Parse cipher suite name into components."""
+    def _parse_cipher_suite(
+        self, info: TLSConnectionInfo, negotiated_group: str | None = None
+    ) -> None:
+        """Parse cipher suite name into components.
+
+        For TLS 1.2 and below, the cipher suite encodes the key exchange
+        (e.g. ECDHE-RSA-AES256-GCM-SHA384). For TLS 1.3, key exchange is
+        negotiated out-of-band via the `supported_groups` extension and is
+        NOT present in the suite name (e.g. TLS_AES_256_GCM_SHA384). TLS 1.3
+        mandates (EC)DHE, so we default to ECDHE when the protocol is 1.3
+        and use `negotiated_group` (when available from stdlib) to refine.
+        """
         suite = info.cipher_suite.upper()
+        protocol = info.protocol_version.upper().replace("V", "")
 
         # Key exchange
-        if "ECDHE" in suite:
+        if negotiated_group:
+            info.key_exchange = negotiated_group
+        elif "ECDHE" in suite:
             info.key_exchange = "ECDHE"
         elif "DHE" in suite or "EDH" in suite:
             info.key_exchange = "DHE"
         elif "RSA" in suite and "ECDHE" not in suite and "DHE" not in suite:
             info.key_exchange = "RSA"
+        elif "TLS1.3" in protocol or "TLS 1.3" in protocol:
+            # TLS 1.3 always uses (EC)DHE; cipher suite doesn't encode it.
+            # Python <3.13 stdlib can't expose the specific group, so we
+            # report generic ECDHE (quantum-vulnerable, like all classical
+            # ECDH). Most servers negotiate X25519 or P-256 with Python's
+            # default client.
+            info.key_exchange = "ECDHE"
 
         # Authentication
         if "ECDSA" in suite:

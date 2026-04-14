@@ -44,7 +44,7 @@ Contact: **support@vradar.io** for enterprise licensing.
 - **Q-Day is coming** — Quantum computers will break RSA, ECDSA, and DH. NIST has finalized replacement standards (FIPS 203/204). The clock is ticking.
 - **No existing open-source tool does the full picture** — scan + benchmark + roadmap + cost estimation + compliance check, all in one CLI.
 - **One command to know where you stand** — `pqc-analyzer scan tls yourdomain.com`
-- **163 tests, offline-first** — works in air-gapped environments and CI/CD pipelines.
+- **172 tests, offline-first** — works in air-gapped environments and CI/CD pipelines.
 
 ## Quick Start
 
