@@ -13,6 +13,12 @@ Scan your infrastructure for quantum-vulnerable cryptography. Get a migration ro
 
 ![Demo](docs/demo.gif)
 
+### Scan output at a glance
+
+![Scan output](docs/scan_screenshot.png)
+
+Every TLS 1.3 endpoint in the wild still negotiates classical ECDHE for its key exchange — quantum-vulnerable under Harvest-Now-Decrypt-Later. The scanner flags each one as `HIGH` and points at the NIST FIPS 203 replacement (`ML-KEM-768`) or a hybrid (`X25519Kyber768`).
+
 ---
 
 ## Features

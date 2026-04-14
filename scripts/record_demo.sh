@@ -23,26 +23,27 @@ echo "  ================================="
 echo ""
 sleep 1
 
-# 1. Scan multiple TLS endpoints
+# 1. Scan multiple TLS endpoints — the headline finding
 type_cmd "pqc-analyzer scan tls google.com cloudflare.com github.com"
 pqc-analyzer scan tls google.com cloudflare.com github.com
-sleep 2
+# Hold on the findings table so viewers can read ECDHE -> ML-KEM-768
+sleep 6
 
 # 2. Generate roadmap
 type_cmd "pqc-analyzer roadmap /tmp/scan_results.json --org \"Acme Corp\""
 pqc-analyzer scan tls google.com cloudflare.com github.com -o /tmp/demo_scan.json 2>/dev/null
 pqc-analyzer roadmap /tmp/demo_scan.json --org "Acme Corp"
-sleep 2
+sleep 5
 
 # 3. Benchmark
 type_cmd "pqc-analyzer benchmark kem --iterations 100"
 pqc-analyzer benchmark kem --iterations 100
-sleep 2
+sleep 4
 
 # 4. Hardware info
 type_cmd "pqc-analyzer benchmark hardware"
 pqc-analyzer benchmark hardware
-sleep 2
+sleep 3
 
 echo ""
 echo "  ⭐ GitHub: https://github.com/xuxu298/PQCAnalyzer"
