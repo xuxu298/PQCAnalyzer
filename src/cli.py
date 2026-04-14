@@ -205,8 +205,13 @@ def scan_tls(
         console.print()
         _print_findings_table(inventory.all_findings)
         _print_summary(inventory.summary)
-    else:
+    elif any(r.status.value == "success" for r in inventory.scan_results):
         console.print(f"\n[cyan]{t('no_findings')}[/cyan]")
+    else:
+        console.print(
+            "\n[yellow]All scans failed — no results. "
+            "Check hostname/port and network connectivity.[/yellow]"
+        )
 
     _save_output(inventory.to_dict(), output)
 
@@ -774,110 +779,6 @@ def generate_roadmap(
         console.print(f"  [{status_style}]{c.status.upper()}[/{status_style}] {c.standard}")
 
     _save_output(roadmap.to_dict(), output)
-
-
-@app.command("report")
-def generate_report(
-    scan_results: Annotated[str, typer.Argument(help="Path to scan results JSON file")],
-    format: Annotated[str, typer.Option("--format", "-f", help="Report format: html, json, sarif")] = "html",
-    organization: Annotated[str, typer.Option("--org", help="Organization name")] = "",
-    prepared_by: Annotated[str, typer.Option("--prepared-by", help="Report author")] = "",
-    output: Annotated[str, typer.Option("--output", "-o", help="Output file path")] = "report.html",
-    language: LanguageOption = "en",
-    verbose: VerboseOption = 0,
-) -> None:
-    """Generate assessment report from scan results."""
-    _setup_logging(verbose)
-    set_language(language)  # type: ignore[arg-type]
-
-    from src.roadmap.compliance_checker import check_compliance
-    from src.roadmap.cost_estimator import estimate_cost
-    from src.roadmap.models import MigrationRoadmap
-    from src.roadmap.priority_engine import build_migration_tasks, build_phases
-    from src.roadmap.recommendation import recommend_all
-    from src.roadmap.risk_scorer import score_findings
-    from src.scanner.models import Finding
-
-    # Load scan results
-    results_path = Path(scan_results)
-    if not results_path.exists():
-        console.print(f"[red]File not found: {scan_results}[/red]")
-        raise typer.Exit(1)
-
-    import json as json_mod
-    data = json_mod.loads(results_path.read_text())
-
-    findings: list[Finding] = []
-    scan_data = data.get("results", data.get("scan_results", []))
-    for r in scan_data:
-        for f_data in r.get("findings", []):
-            findings.append(Finding(
-                component=f_data["component"],
-                algorithm=f_data["algorithm"],
-                risk_level=RiskLevel(f_data["risk_level"]),
-                quantum_vulnerable=f_data["quantum_vulnerable"],
-                location=f_data.get("location", ""),
-                replacement=f_data.get("replacement", []),
-                migration_priority=f_data.get("migration_priority", 5),
-                note=f_data.get("note", ""),
-            ))
-
-    if not findings:
-        console.print("[red]No findings in scan results.[/red]")
-        raise typer.Exit(1)
-
-    # Build roadmap
-    with console.status("Building roadmap..."):
-        risk_scores = score_findings(findings)
-        recommendations = recommend_all(findings)
-        tasks = build_migration_tasks(findings, risk_scores, recommendations)
-        phases = build_phases(tasks)
-        cost = estimate_cost(phases)
-        compliance = check_compliance(findings)
-
-    critical_count = sum(1 for f in findings if f.risk_level == RiskLevel.CRITICAL)
-    overall = RiskLevel.CRITICAL if critical_count > 0 else RiskLevel.HIGH
-
-    roadmap = MigrationRoadmap(
-        organization=organization,
-        overall_risk=overall,
-        phases=phases,
-        risk_scores=risk_scores,
-        cost_estimate=cost,
-        compliance=compliance,
-        total_findings=len(findings),
-        critical_findings=critical_count,
-        quantum_vulnerable_count=sum(1 for f in findings if f.quantum_vulnerable),
-    )
-
-    # Generate report
-    try:
-        if format == "html":
-            from src.reporter.html_report import generate_html_report, save_html_report
-            html = generate_html_report(
-                roadmap=roadmap,
-                findings=findings,
-                language=language,
-                organization=organization,
-                prepared_by=prepared_by,
-            )
-            save_html_report(html, output)
-            console.print(f"[green]HTML report saved to: {output}[/green]")
-        elif format == "json":
-            from src.reporter.json_export import export_json
-            export_json(roadmap, output)
-            console.print(f"[green]JSON report saved to: {output}[/green]")
-        elif format == "sarif":
-            from src.reporter.json_export import export_sarif
-            export_sarif(roadmap, output)
-            console.print(f"[green]SARIF report saved to: {output}[/green]")
-        else:
-            console.print(f"[red]Unknown format: {format}. Use html, json, or sarif.[/red]")
-            raise typer.Exit(1)
-    except ImportError:
-        console.print("[red]Reporter module not available in this deployment.[/red]")
-        console.print("Install with: pip install -e '.[report]' or contact your administrator.")
-        raise typer.Exit(1)
 
 
 def _risk_icon_for_priority(priority: int) -> str:

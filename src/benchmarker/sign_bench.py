@@ -29,9 +29,11 @@ def bench_sign_classical(
         try:
             key = rsa.generate_private_key(65537, 2048)
             pub = key.public_key()
+            # Use MAX_LENGTH for signing; AUTO is verify-only in newer
+            # versions of the cryptography library.
             rsa_padding = padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.AUTO,
+                salt_length=padding.PSS.MAX_LENGTH,
             )
 
             sign_samples = _measure_iterations(
