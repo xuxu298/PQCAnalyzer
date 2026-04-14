@@ -676,7 +676,7 @@ def generate_roadmap(
     set_language(language)  # type: ignore[arg-type]
 
     from src.roadmap.compliance_checker import check_compliance
-    from src.roadmap.cost_estimator import estimate_cost, format_vnd
+    from src.roadmap.cost_estimator import estimate_cost
     from src.roadmap.models import MigrationRoadmap
     from src.roadmap.priority_engine import build_migration_tasks, build_phases
     from src.roadmap.recommendation import recommend_all
@@ -766,15 +766,11 @@ def generate_roadmap(
             console.print(f"  ... and {len(phase.tasks) - 5} more tasks")
         console.print(f"  Total effort: {phase.total_effort_hours} person-hours\n")
 
-    # Cost summary
-    console.print("[bold]Cost Estimation:[/bold]")
-    console.print(f"  Total effort: {cost.total_person_hours} person-hours")
-    console.print(f"  Timeline: {cost.timeline_months} months")
-    console.print(f"  Cost range: {format_vnd(cost.cost_range_low_vnd)} — {format_vnd(cost.cost_range_high_vnd)}")
-
     # Compliance
-    console.print("\n[bold]Compliance:[/bold]")
+    console.print("[bold]Compliance:[/bold]")
     for c in compliance:
+        if "Ban Co Yeu" in c.standard:
+            continue
         status_style = {"compliant": "green", "non_compliant": "red", "partial": "yellow"}.get(c.status, "white")
         console.print(f"  [{status_style}]{c.status.upper()}[/{status_style}] {c.standard}")
 
