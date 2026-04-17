@@ -17,7 +17,7 @@ Scan your infrastructure for quantum-vulnerable cryptography. Get a migration ro
 
 ![Scan output](docs/scan_screenshot.png)
 
-Every TLS 1.3 endpoint in the wild still negotiates classical ECDHE for its key exchange — quantum-vulnerable under Harvest-Now-Decrypt-Later. The scanner flags each one as `HIGH` and points at the NIST FIPS 203 replacement (`ML-KEM-768`) or a hybrid (`X25519Kyber768`).
+Cloudflare and Google now serve hybrid `X25519MLKEM768` (IANA 0x11EC) by default — the scanner detects this via an active TLS 1.3 ClientHello probe and marks those endpoints SAFE. GitHub still negotiates classical `ECDHE`, so it gets flagged `HIGH` with the NIST FIPS 203 replacement (`ML-KEM-768`) called out. The scan surfaces what's actually on the wire, not what a server *could* support.
 
 ---
 
