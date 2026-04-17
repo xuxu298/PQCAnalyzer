@@ -496,10 +496,34 @@
       "risk_level": "SAFE",
       "attack": "None known",
       "estimated_break": "N/A",
+      "replacement": ["X25519MLKEM768"],
+      "migration_priority": 0,
+      "note_vi": "Hybrid X25519 + Kyber-768 (draft cũ, codepoint 0x6399). Chuyển sang X25519MLKEM768 chuẩn IANA.",
+      "note_en": "Legacy hybrid X25519 + Kyber-768 (draft, codepoint 0x6399). Migrate to standardized X25519MLKEM768."
+    },
+    "X25519MLKEM768": {
+      "type": "kem",
+      "usage": ["key_exchange"],
+      "quantum_vulnerable": false,
+      "risk_level": "SAFE",
+      "attack": "None known",
+      "estimated_break": "N/A",
       "replacement": [],
       "migration_priority": 0,
-      "note_vi": "Hybrid key exchange: X25519 + ML-KEM-768. Lựa chọn chuyển tiếp tốt nhất.",
-      "note_en": "Hybrid key exchange: X25519 + ML-KEM-768. Best transitional choice."
+      "note_vi": "Hybrid X25519 + ML-KEM-768 (IANA codepoint 0x11EC). Đang được Cloudflare, Google, AWS triển khai trong TLS 1.3.",
+      "note_en": "Hybrid X25519 + ML-KEM-768 (IANA codepoint 0x11EC). Shipping in TLS 1.3 at Cloudflare, Google, AWS."
+    },
+    "SecP256r1MLKEM768": {
+      "type": "kem",
+      "usage": ["key_exchange"],
+      "quantum_vulnerable": false,
+      "risk_level": "SAFE",
+      "attack": "None known",
+      "estimated_break": "N/A",
+      "replacement": [],
+      "migration_priority": 0,
+      "note_vi": "Hybrid P-256 + ML-KEM-768 (IANA codepoint 0x11EB). Cho stack yêu cầu NIST curve.",
+      "note_en": "Hybrid P-256 + ML-KEM-768 (IANA codepoint 0x11EB). For NIST-curve-required stacks."
     }
   }
 }

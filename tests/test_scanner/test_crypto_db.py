@@ -86,6 +86,31 @@ class TestAlgorithmDatabase:
         assert info.quantum_vulnerable is False
         assert info.risk_level == RiskLevel.SAFE
 
+    def test_classify_x25519_mlkem768(self, db):
+        """IANA codepoint 0x11EC — the hybrid Cloudflare/Google/AWS ship today."""
+        for variant in ("X25519MLKEM768", "x25519_mlkem768", "X25519-ML-KEM-768"):
+            info = db.classify(variant)
+            assert info is not None, f"{variant} should classify"
+            assert info.name == "X25519MLKEM768"
+            assert info.quantum_vulnerable is False
+            assert info.risk_level == RiskLevel.SAFE
+
+    def test_classify_secp256r1_mlkem768(self, db):
+        """IANA codepoint 0x11EB — NIST-curve hybrid variant."""
+        for variant in ("SecP256r1MLKEM768", "secp256r1_mlkem768", "P-256-ML-KEM-768"):
+            info = db.classify(variant)
+            assert info is not None, f"{variant} should classify"
+            assert info.name == "SecP256r1MLKEM768"
+            assert info.quantum_vulnerable is False
+            assert info.risk_level == RiskLevel.SAFE
+
+    def test_classify_hybrid_does_not_fall_back_to_classical(self, db):
+        """Regression: hybrid PQ groups must NOT match the X25519 branch first."""
+        info = db.classify("X25519MLKEM768")
+        assert info is not None
+        assert info.name != "X25519", "hybrid was mis-classified as plain X25519"
+        assert info.quantum_vulnerable is False
+
     def test_classify_ml_kem(self, db):
         info = db.classify("ML-KEM-768")
         assert info is not None

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from src.scanner.models import TLSConnectionInfo
+from src.scanner.models import TLSConnectionInfo, TLSInfo
 from src.scanner.tls_scanner import TLSScanner
+from src.utils.constants import RiskLevel
 
 
 def _parse(suite: str, protocol: str, negotiated_group: str | None = None) -> TLSConnectionInfo:
@@ -72,3 +73,31 @@ class TestParseCipherSuiteTLS13:
             "TLS_AES_256_GCM_SHA384", "TLSv1.3", negotiated_group="X25519MLKEM768"
         )
         assert info.key_exchange == "X25519MLKEM768"
+
+
+class TestAnalyzeHybridPQ:
+    """End-to-end: hybrid PQ kex must produce a PQ-safe finding, not vulnerable."""
+
+    def _analyze(self, group: str):
+        info = TLSConnectionInfo(
+            cipher_suite="TLS_AES_256_GCM_SHA384",
+            protocol_version="TLSv1.3",
+            supported_protocols=["TLSv1.3"],
+        )
+        TLSScanner()._parse_cipher_suite(info, negotiated_group=group)
+        return TLSScanner()._analyze(info, "example.com:443")
+
+    def test_x25519mlkem768_is_pq_safe(self):
+        findings = self._analyze("X25519MLKEM768")
+        kex = [f for f in findings if f.component == TLSInfo.KEY_EXCHANGE]
+        assert len(kex) == 1
+        assert kex[0].algorithm == "X25519MLKEM768"
+        assert kex[0].quantum_vulnerable is False
+        assert kex[0].risk_level == RiskLevel.SAFE
+
+    def test_plain_x25519_still_vulnerable(self):
+        """Regression guard: classical X25519 must still be flagged."""
+        findings = self._analyze("X25519")
+        kex = [f for f in findings if f.component == TLSInfo.KEY_EXCHANGE]
+        assert len(kex) == 1
+        assert kex[0].quantum_vulnerable is True

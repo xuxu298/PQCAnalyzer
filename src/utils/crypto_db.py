@@ -119,6 +119,16 @@ class AlgorithmDatabase:
             size = sha_match.group(1)
             return self.lookup(f"SHA-{size}")
 
+        # Hybrid PQ KEMs — match BEFORE plain X25519/P-256 so we don't
+        # mis-classify a hybrid as its classical half (false negative).
+        is_mlkem = "MLKEM" in name or "ML-KEM" in name
+        if is_mlkem and "X25519" in name:
+            return self.lookup("X25519MLKEM768")
+        if is_mlkem and ("SECP256" in name or "P-256" in name or "P256" in name):
+            return self.lookup("SecP256r1MLKEM768")
+        if "KYBER" in name and "X25519" in name:
+            return self.lookup("X25519Kyber768")
+
         # Ed25519 / Ed448
         if "ED25519" in name or "CURVE25519" in name:
             if "ECDHE" in name or "KEX" in name or "X25519" in name:
@@ -129,8 +139,6 @@ class AlgorithmDatabase:
         if "X448" in name:
             return self.lookup("X448")
         if "X25519" in name:
-            if "KYBER" in name:
-                return self.lookup("X25519Kyber768")
             return self.lookup("X25519")
 
         # ChaCha20

@@ -17,6 +17,7 @@ from src.scanner.models import (
     TLSConnectionInfo,
     TLSInfo,
 )
+from src.scanner.pq_probe import probe_x25519mlkem768
 from src.utils.constants import RiskLevel, ScanType, TLS_VERSIONS
 from src.utils.crypto_db import get_algorithm_db
 from src.utils.i18n import t
@@ -84,6 +85,21 @@ class TLSScanner:
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
 
+        # Offer post-quantum hybrid groups so servers that support them will
+        # negotiate them. Requires Python 3.13+ and OpenSSL 3.5+; on older
+        # stacks we silently fall back to the stdlib default groups.
+        if hasattr(ctx, "set_groups"):
+            try:
+                ctx.set_groups([
+                    "X25519MLKEM768",
+                    "SecP256r1MLKEM768",
+                    "x25519",
+                    "secp256r1",
+                    "secp384r1",
+                ])
+            except (ssl.SSLError, ValueError):
+                pass
+
         with socket.create_connection((host, port), timeout=timeout_sec) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 # Negotiated connection info
@@ -113,7 +129,28 @@ class TLSScanner:
         # Probe for supported protocols
         info.supported_protocols = self._probe_protocols(host, port, timeout_sec)
 
+        # If stdlib didn't surface a PQ hybrid group (Python <3.13 / OpenSSL
+        # <3.5 cannot offer X25519MLKEM768), do an active probe so we can
+        # still detect servers that support it.
+        if "MLKEM" not in info.key_exchange.upper():
+            self._probe_pq_groups(info, host, port, timeout_sec)
+
         return info
+
+    def _probe_pq_groups(
+        self, info: TLSConnectionInfo, host: str, port: int, timeout: float
+    ) -> None:
+        """Active raw-ClientHello probe for PQ hybrid groups."""
+        try:
+            result = probe_x25519mlkem768(host, port, timeout=timeout)
+        except Exception as exc:
+            logger.debug("PQ probe error for %s: %s", host, exc)
+            return
+        if result.supported:
+            # Promote to the actual negotiated kex; keep the classical
+            # finding suppressed since the PQ hybrid is what's available.
+            info.key_exchange = result.selected_group or "X25519MLKEM768"
+            logger.info("Active PQ probe: %s supports %s", host, info.key_exchange)
 
     def _parse_cipher_suite(
         self, info: TLSConnectionInfo, negotiated_group: str | None = None
