@@ -775,8 +775,6 @@ def generate_roadmap(
     # Compliance
     console.print("[bold]Compliance:[/bold]")
     for c in compliance:
-        if "Ban Co Yeu" in c.standard:
-            continue
         status_style = {"compliant": "green", "non_compliant": "red", "partial": "yellow"}.get(c.status, "white")
         console.print(f"  [{status_style}]{c.status.upper()}[/{status_style}] {c.standard}")
 

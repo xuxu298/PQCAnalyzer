@@ -1,27 +1,24 @@
-"""Compliance checker — verify against NIST and Vietnam BCY guidelines."""
+"""Compliance checker — verify against NIST cryptographic standards."""
 
 from __future__ import annotations
 
 from src.roadmap.models import ComplianceStatus
 from src.scanner.models import Finding
-from src.utils.constants import RiskLevel
 
 
 def check_compliance(findings: list[Finding]) -> list[ComplianceStatus]:
     """Check findings against compliance standards.
 
     Currently checks:
-    - NIST SP 800-208 (commercial NSA suite replacement)
-    - NIST FIPS 203/204/205 readiness
-    - CNSS Policy 15 (quantum-safe timelines)
-    - Vietnam Ban Co Yeu (when guidelines available)
+    - NIST FIPS 203/204 readiness
+    - NIST SP 800-131A (deprecated algorithms)
+    - NIST SP 800-57 (minimum key lengths)
     """
     statuses: list[ComplianceStatus] = []
 
     statuses.extend(_check_nist_pqc_readiness(findings))
     statuses.extend(_check_deprecated_algorithms(findings))
     statuses.extend(_check_key_lengths(findings))
-    statuses.extend(_check_vietnam_bcy(findings))
 
     return statuses
 
@@ -131,39 +128,3 @@ def _check_key_lengths(findings: list[Finding]) -> list[ComplianceStatus]:
     )]
 
 
-def _check_vietnam_bcy(findings: list[Finding]) -> list[ComplianceStatus]:
-    """Check against Vietnam Ban Co Yeu (Government Cipher Committee) guidelines.
-
-    Note: Vietnam's specific PQC migration guidelines are still being developed.
-    This checks against known general requirements.
-    """
-    qv_findings = [f for f in findings if f.quantum_vulnerable]
-    critical = [f for f in findings
-                if (f.risk_level == RiskLevel.CRITICAL
-                    if isinstance(f.risk_level, RiskLevel)
-                    else f.risk_level == "CRITICAL")]
-
-    status = "compliant"
-    details = "No critical issues detected."
-    remediation = ""
-
-    if critical:
-        status = "non_compliant"
-        details = (f"{len(critical)} critical finding(s), {len(qv_findings)} quantum-vulnerable. "
-                   "Vietnamese government systems should prioritize PQC migration "
-                   "per Ban Co Yeu guidance on cryptographic modernization.")
-        remediation = ("Follow NIST PQC timeline. Begin hybrid deployment for internet-facing services. "
-                      "Coordinate with Ban Co Yeu for compliance verification.")
-    elif qv_findings:
-        status = "partial"
-        details = (f"{len(qv_findings)} quantum-vulnerable finding(s). "
-                   "Plan migration per PQC readiness timeline.")
-        remediation = "Begin PQC readiness assessment and migration planning."
-
-    return [ComplianceStatus(
-        standard="Vietnam Ban Co Yeu - Cryptographic Modernization",
-        requirement="PQC readiness for government and critical infrastructure",
-        status=status,
-        details=details,
-        remediation=remediation,
-    )]

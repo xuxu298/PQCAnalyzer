@@ -28,7 +28,7 @@ Cloudflare and Google now serve hybrid `X25519MLKEM768` (IANA 0x11EC) by default
 - **Crypto Inventory Scanner** — TLS endpoints, certificates, SSH/VPN configs, source code
 - **PQC Benchmarker** — Compare classical vs PQC algorithms (ML-KEM, ML-DSA) on your hardware
 - **Migration Roadmap** — Risk scoring, priority engine, 4-phase migration plan with cost estimation
-- **Compliance Checker** — NIST FIPS 203/204, SP 800-131A, Vietnam Ban Co Yeu guidelines
+- **Compliance Checker** — NIST FIPS 203/204, SP 800-131A, SP 800-57
 - **CLI** — Full command-line interface with rich output
 - **Bilingual** — Vietnamese/English support
 - **JSON output** — Scan results and roadmaps exported as structured JSON
