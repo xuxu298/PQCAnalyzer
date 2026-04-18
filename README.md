@@ -245,4 +245,14 @@ Liên hệ **support@vradar.io** để sử dụng phiên bản Enterprise.
 
 ---
 
+## About
+
+PQCAnalyzer is built and maintained by [Nguyen Dong](https://www.linkedin.com/in/dongnx/), founder of **[Vradar.io](https://vradar.io)** — an AI-assisted SOC platform with built-in post-quantum log transport (ML-KEM-768 + ML-DSA-65, FIPS 203/204) for enterprise customers in Vietnam and APAC.
+
+If this tool helped you surface quantum-vulnerable crypto in your infrastructure and your organization needs a commercial SOC with PQC built in from day one, visit **https://vradar.io**.
+
+For PQCAnalyzer Enterprise (REST API, Web UI, reports, on-prem deploy): **support@vradar.io**.
+
+---
+
 **Developed by:** [Nguyen Dong](https://www.linkedin.com/in/dongnx/) — Founder of [vradar.io](https://vradar.io) | **License:** MIT

@@ -46,3 +46,7 @@ web/
 src/api/
 src/reporter/
 tests/test_reporter/
+
+# Marketing (internal only — không push public)
+marketing/
+marketingplan.md

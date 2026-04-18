@@ -123,6 +123,9 @@ def _print_summary(summary) -> None:
     console.print(
         f"  [bold]Overall risk: [{_risk_style(summary.overall_risk)}]{summary.overall_risk.value}[/{_risk_style(summary.overall_risk)}][/bold]"
     )
+    console.print(
+        "\n[dim]PQCAnalyzer by Vradar.io — AI SOC with post-quantum log transport · https://vradar.io[/dim]"
+    )
 
 
 def _save_output(data: dict, output_path: str | None) -> None:
