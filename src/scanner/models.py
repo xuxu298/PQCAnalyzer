@@ -22,9 +22,17 @@ class Finding:
     replacement: list[str] = field(default_factory=list)
     migration_priority: int = 5
     note: str = ""
+    # How the finding was arrived at. For TLS key-exchange findings:
+    #   "passive"          — observed in the handshake; probe not run or errored.
+    #                        Risk reflects bytes-on-the-wire (HNDL).
+    #   "active_declined"  — raw-ClientHello probe offered X25519MLKEM768, server
+    #                        picked classical. Risk reflects server-grade readiness.
+    #   "active_supported" — probe or stdlib handshake negotiated a PQ hybrid.
+    # Empty for findings where the distinction doesn't apply (cert, cipher, MAC, SSH, code).
+    detection_mode: str = ""
 
     def to_dict(self) -> dict:
-        return {
+        out = {
             "component": self.component,
             "algorithm": self.algorithm,
             "risk_level": self.risk_level.value,
@@ -34,6 +42,9 @@ class Finding:
             "migration_priority": self.migration_priority,
             "note": self.note,
         }
+        if self.detection_mode:
+            out["detection_mode"] = self.detection_mode
+        return out
 
 
 @dataclass
@@ -157,6 +168,8 @@ class TLSConnectionInfo:
     supported_protocols: list[str] = field(default_factory=list)
     supported_ciphers: list[str] = field(default_factory=list)
     certificate_chain: list[dict] = field(default_factory=list)
+    # How the key_exchange value was established. See Finding.detection_mode.
+    detection_mode: str = ""
 
 
 @dataclass

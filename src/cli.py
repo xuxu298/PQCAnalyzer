@@ -84,6 +84,7 @@ def _print_findings_table(findings: list) -> None:
     table.add_column("Component", width=20)
     table.add_column("Algorithm", width=20)
     table.add_column("QV", width=4)  # Quantum Vulnerable
+    table.add_column("Mode", width=17)
     table.add_column("Location", width=35)
     table.add_column("Replacement", width=25)
 
@@ -91,11 +92,13 @@ def _print_findings_table(findings: list) -> None:
         risk = RiskLevel(f.risk_level) if isinstance(f.risk_level, str) else f.risk_level
         qv = "[red]Yes[/red]" if f.quantum_vulnerable else "[green]No[/green]"
         replacement = ", ".join(f.replacement[:2]) if f.replacement else "—"
+        mode = getattr(f, "detection_mode", "") or "—"
         table.add_row(
             f"{_risk_icon(risk)} {risk.value}",
             f.component,
             f.algorithm,
             qv,
+            mode,
             f.location[:35],
             replacement,
         )

@@ -132,7 +132,11 @@ class TLSScanner:
         # If stdlib didn't surface a PQ hybrid group (Python <3.13 / OpenSSL
         # <3.5 cannot offer X25519MLKEM768), do an active probe so we can
         # still detect servers that support it.
-        if "MLKEM" not in info.key_exchange.upper():
+        if "MLKEM" in info.key_exchange.upper():
+            # stdlib handshake already negotiated PQ hybrid — the connection
+            # itself is proof the server supports it.
+            info.detection_mode = "active_supported"
+        else:
             self._probe_pq_groups(info, host, port, timeout_sec)
 
         return info
@@ -140,17 +144,29 @@ class TLSScanner:
     def _probe_pq_groups(
         self, info: TLSConnectionInfo, host: str, port: int, timeout: float
     ) -> None:
-        """Active raw-ClientHello probe for PQ hybrid groups."""
+        """Active raw-ClientHello probe for PQ hybrid groups.
+
+        Outcomes set info.detection_mode:
+          active_supported — server picked X25519MLKEM768
+          active_declined  — server picked classical despite being offered hybrid
+          passive          — probe errored; only observed traffic tells the story
+        """
         try:
             result = probe_x25519mlkem768(host, port, timeout=timeout)
         except Exception as exc:
             logger.debug("PQ probe error for %s: %s", host, exc)
+            info.detection_mode = "passive"
             return
         if result.supported:
             # Promote to the actual negotiated kex; keep the classical
             # finding suppressed since the PQ hybrid is what's available.
             info.key_exchange = result.selected_group or "X25519MLKEM768"
+            info.detection_mode = "active_supported"
             logger.info("Active PQ probe: %s supports %s", host, info.key_exchange)
+        elif result.error:
+            info.detection_mode = "passive"
+        else:
+            info.detection_mode = "active_declined"
 
     def _parse_cipher_suite(
         self, info: TLSConnectionInfo, negotiated_group: str | None = None
@@ -277,6 +293,7 @@ class TLSScanner:
                     replacement=algo_info.replacement,
                     migration_priority=algo_info.migration_priority,
                     note=algo_info.note_en,
+                    detection_mode=info.detection_mode or "passive",
                 ))
 
         # Check bulk cipher
