@@ -1,0 +1,53 @@
+# Default data-sensitivity classification rules for flow_analyzer.
+# First matching rule wins; the final match_all rule is the fallback.
+# Override with --sensitivity-map /path/to/custom.yaml.
+#
+# Pattern fields (any-of, all-present-must-match):
+#   sni_regex       : regex, matched against TLS SNI (server_name) if present
+#   dst_port        : int or list of ints
+#   src_port        : int or list of ints
+#   dst_ip_cidr     : list of CIDRs, matched against dst_ip
+#   match_all       : bool — wildcard; place at the end as default
+#
+# Output:
+#   sensitivity : public | internal | confidential | restricted | secret
+#   retention   : ephemeral | short | medium | long | lifetime
+#   rationale   : free-form string, surfaced in the report
+
+rules:
+  - pattern:
+      sni_regex: ".*\\.(medical|health|hospital|benhvien|bv)\\..*"
+    sensitivity: secret
+    retention: lifetime
+    rationale: "Medical data — Luật Khám chữa bệnh 2023 lưu hồ sơ bệnh án tối thiểu 10 năm."
+
+  - pattern:
+      dst_port: [443, 8443]
+      sni_regex: ".*(vietcombank|vietinbank|bidv|agribank|techcombank|mbbank|vpbank|acb|sacombank|shb|hdbank|tpbank|ocb|eximbank|lienvietpostbank|seabank|msb|vib|abbank|ncb|pgbank|bac[-]?a[-]?bank|saigonbank|kienlongbank|vietcapitalbank|nambank|baoviet|timo|cake|ubank|vpay|momo|zalopay|shopeepay|viettelpay|vnpay|onepay|napas|napas247).*"
+    sensitivity: restricted
+    retention: long
+    rationale: "Banking / fintech — Thông tư NHNN quy định lưu trữ giao dịch dài hạn."
+
+  - pattern:
+      sni_regex: ".*(gov\\.vn|\\.chinhphu\\.vn|dichvucong\\.gov\\.vn|vneid\\.gov\\.vn|bhxh\\.gov\\.vn|gdt\\.gov\\.vn|thuedientu).*"
+    sensitivity: secret
+    retention: lifetime
+    rationale: "Government e-service — hồ sơ hành chính cần lưu trữ dài hạn."
+
+  - pattern:
+      dst_port: 22
+    sensitivity: confidential
+    retention: medium
+    rationale: "SSH admin channel — commands + potentially credentials in transit."
+
+  - pattern:
+      dst_port: [500, 4500]
+    sensitivity: confidential
+    retention: long
+    rationale: "IPSec / IKE — site-to-site VPN, often carries sensitive payload."
+
+  - pattern:
+      match_all: true
+    sensitivity: internal
+    retention: short
+    rationale: "Default bucket — generic internal traffic."

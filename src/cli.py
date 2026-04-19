@@ -363,6 +363,95 @@ def scan_vpn(
     _save_output(inventory.to_dict(), output)
 
 
+@scan_app.command("pcap")
+def scan_pcap(
+    path: Annotated[str, typer.Argument(help="Path to .pcap or .pcapng file")],
+    sensitivity_map: Annotated[
+        Optional[str], typer.Option("--sensitivity-map", help="YAML rules file to override defaults")
+    ] = None,
+    bpf_filter: Annotated[
+        Optional[str], typer.Option("--filter", help="BPF-like filter (tcp port 443, udp, host X)")
+    ] = None,
+    output: OutputOption = None,
+    verbose: VerboseOption = 0,
+) -> None:
+    """Scan a PCAP / pcapng capture for HNDL exposure per flow."""
+    _setup_logging(verbose)
+
+    pcap_path = Path(path)
+    if not pcap_path.exists():
+        console.print(f"[red]File not found: {path}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        from src.flow_analyzer.data_classifier import ClassificationRules
+        from src.flow_analyzer.flow_aggregator import FlowAggregator
+        from src.flow_analyzer.hndl_scorer import score_hndl
+        from src.flow_analyzer.pcap_reader import (
+            InvalidPCAPError,
+            UnsupportedLinkTypeError,
+            read_pcap,
+        )
+        from src.flow_analyzer.reporter import generate_report, render_cli, render_json
+    except ModuleNotFoundError as exc:
+        console.print(Panel(
+            f"[yellow]Flow analysis dependencies missing.[/yellow]\n\n"
+            f"Install with: [cyan]pip install \"vn-pqc-analyzer[flow]\"[/cyan]\n\n"
+            f"Details: {exc}",
+            title="[bold]flow_analyzer unavailable[/bold]",
+            border_style="yellow",
+        ))
+        raise typer.Exit(1) from exc
+
+    try:
+        rules = ClassificationRules.load(sensitivity_map)
+    except FileNotFoundError:
+        console.print(f"[red]Sensitivity map not found: {sensitivity_map}[/red]")
+        raise typer.Exit(1) from None
+    except ValueError as exc:
+        console.print(f"[red]Invalid sensitivity map: {exc}[/red]")
+        raise typer.Exit(1) from None
+
+    agg = FlowAggregator()
+
+    try:
+        with console.status(f"Reading {pcap_path.name}..."):
+            for pkt in read_pcap(pcap_path, bpf_filter=bpf_filter):
+                agg.ingest(pkt)
+    except InvalidPCAPError as exc:
+        console.print(f"[red]Invalid PCAP: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    except UnsupportedLinkTypeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    flows = list(agg.flush())
+    if not flows:
+        console.print("[yellow]No IPv4/IPv6 TCP/UDP flows observed in capture.[/yellow]")
+        raise typer.Exit(0)
+
+    # Classify + score
+    scored: list = []
+    duration_seconds = 0.0
+    if flows:
+        start = min(f.first_seen for f in flows)
+        end = max(f.last_seen for f in flows)
+        duration_seconds = max(0.0, (end - start).total_seconds())
+
+    for flow in flows:
+        sens, retention, _reason = rules.classify(flow)
+        flow.sensitivity = sens
+        flow.retention = retention
+        score = score_hndl(flow)
+        scored.append((flow, score))
+
+    report = generate_report(scored, source=str(pcap_path), duration_seconds=duration_seconds)
+    render_cli(report, console=console)
+
+    if output:
+        _save_output(render_json(report), output)
+
+
 @scan_app.command("code")
 def scan_code(
     paths: Annotated[list[str], typer.Argument(help="Source file or directory paths")],
@@ -683,37 +772,20 @@ def generate_roadmap(
 
     from src.roadmap.compliance_checker import check_compliance
     from src.roadmap.cost_estimator import estimate_cost
+    from src.roadmap.input_adapter import load_findings
     from src.roadmap.models import MigrationRoadmap
     from src.roadmap.priority_engine import build_migration_tasks, build_phases
     from src.roadmap.recommendation import recommend_all
     from src.roadmap.risk_scorer import score_findings
     from src.roadmap.timeline_generator import generate_timeline
-    from src.scanner.models import Finding
 
-    # Load scan results
+    # Load scan results — adapter auto-detects scanner vs flow_analyzer JSON.
     results_path = Path(scan_results)
     if not results_path.exists():
         console.print(f"[red]File not found: {scan_results}[/red]")
         raise typer.Exit(1)
 
-    import json as json_mod
-    data = json_mod.loads(results_path.read_text())
-
-    findings: list[Finding] = []
-    # Support both "results" and "scan_results" keys
-    scan_data = data.get("results", data.get("scan_results", []))
-    for r in scan_data:
-        for f_data in r.get("findings", []):
-            findings.append(Finding(
-                component=f_data["component"],
-                algorithm=f_data["algorithm"],
-                risk_level=RiskLevel(f_data["risk_level"]),
-                quantum_vulnerable=f_data["quantum_vulnerable"],
-                location=f_data.get("location", ""),
-                replacement=f_data.get("replacement", []),
-                migration_priority=f_data.get("migration_priority", 5),
-                note=f_data.get("note", ""),
-            ))
+    findings = load_findings(results_path)
 
     if not findings:
         console.print("[red]No findings in scan results.[/red]")

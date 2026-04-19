@@ -67,8 +67,15 @@ benchmark = [
     "liboqs-python>=0.10.0",
     "psutil>=5.9.0",
 ]
+flow = [
+    "scapy>=2.5.0",
+    "PyYAML>=6.0",
+]
+flow-extras = [
+    "pyshark>=0.6",
+]
 all = [
-    "vn-pqc-analyzer[dev,web,report,benchmark]",
+    "vn-pqc-analyzer[dev,web,report,benchmark,flow]",
 ]
 
 [project.scripts]

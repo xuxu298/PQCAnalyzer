@@ -19,6 +19,12 @@ Scan your infrastructure for quantum-vulnerable cryptography. Get a migration ro
 
 Cloudflare and Google now serve hybrid `X25519MLKEM768` (IANA 0x11EC) by default — the scanner detects this via an active TLS 1.3 ClientHello probe and marks those endpoints SAFE. GitHub still negotiates classical `ECDHE`, so it gets flagged `HIGH` with the NIST FIPS 203 replacement (`ML-KEM-768`) called out. The scan surfaces what's actually on the wire, not what a server *could* support.
 
+### Flow Analysis (HNDL Radar) in action
+
+![Flow demo](docs/flow_demo.gif)
+
+`scan pcap` groups packets into 5-tuple flows, parses the TLS/SSH handshake, classifies each flow's data sensitivity from SNI/port rules, and scores `HNDL = 100 × V × S × R × E`. The demo above runs on a **synthetic fixture** (`docs/fixtures/flow_demo.pcap`) shipped in the repo — every handshake byte is hand-crafted in `scripts/mk_flow_demo_pcap.py` so results are deterministic and offline-reproducible. For real traffic, feed any PCAP you captured yourself (see [capture recipes](docs/flow-analysis.md#feeding-real-traffic)).
+
 ---
 
 ## Features
@@ -26,6 +32,7 @@ Cloudflare and Google now serve hybrid `X25519MLKEM768` (IANA 0x11EC) by default
 ### Community Edition (this repo)
 
 - **Crypto Inventory Scanner** — TLS endpoints, certificates, SSH/VPN configs, source code
+- **Flow Analysis (HNDL Radar)** — Parse PCAP traffic (tcpdump capture, Wireshark export, SPAN-port dump), score each flow's Harvest-Now-Decrypt-Later exposure with V × S × R × E. No decryption keys needed — handshakes travel in plaintext. See [`docs/flow-analysis.md`](docs/flow-analysis.md) for capture recipes.
 - **PQC Benchmarker** — Compare classical vs PQC algorithms (ML-KEM, ML-DSA) on your hardware
 - **Migration Roadmap** — Risk scoring, priority engine, 4-phase migration plan with cost estimation
 - **Compliance Checker** — NIST FIPS 203/204, SP 800-131A, SP 800-57
@@ -72,6 +79,12 @@ With PQC benchmark support (requires liboqs):
 pip install -e ".[benchmark]"
 ```
 
+With PCAP flow analysis support:
+
+```bash
+pip install -e ".[flow]"
+```
+
 ### CLI Usage
 
 ```bash
@@ -90,7 +103,11 @@ pqc-analyzer scan code /path/to/project/src
 # Scan config files (nginx, apache, haproxy)
 pqc-analyzer scan config /etc/nginx/nginx.conf
 
-# Generate migration roadmap
+# Analyse a PCAP capture (HNDL Radar)
+# See docs/flow-analysis.md for capturing real traffic (tcpdump, SPAN, Wireshark)
+pqc-analyzer scan pcap corp_edge.pcap -o flow_report.json
+
+# Generate migration roadmap (accepts scanner OR flow JSON)
 pqc-analyzer roadmap scan_results.json
 
 # Run PQC benchmark
@@ -113,14 +130,15 @@ docker run pqc-analyzer scan tls example.com
 ```
 src/
   scanner/          # Crypto inventory scanner (TLS, cert, SSH, VPN, code)
+  flow_analyzer/    # PCAP flow analyser + HNDL scorer (V x S x R x E)
   benchmarker/      # PQC performance benchmarker (KEM, signatures)
   roadmap/          # Migration roadmap (risk, recommendation, priority, cost)
   utils/            # Shared utilities (crypto DB, i18n, constants)
   cli.py            # CLI entry point (typer)
 
-data/               # Algorithm database, NIST/Vietnam guidelines
+data/               # Algorithm database, NIST/Vietnam guidelines, sensitivity rules
 examples/           # Demo scripts
-tests/              # 163+ tests
+tests/              # 250+ tests (scanner, roadmap, flow_analyzer)
 ```
 
 ## Scan Targets
@@ -133,6 +151,7 @@ tests/              # 163+ tests
 | VPN | OpenVPN/WireGuard/IPSec configs | Crypto primitives, DH groups |
 | Code | Source directories | Crypto API usage in Python/Java/Go/JS/C |
 | Config | nginx/apache/haproxy | SSL/TLS settings |
+| PCAP | `.pcap` / `.pcapng` | Per-flow HNDL score (TLS 1.2/1.3, SSH-2) |
 
 ## Output Format
 
@@ -207,6 +226,7 @@ Công cụ mã nguồn mở giúp quét thuật toán mật mã trong hạ tần
 | | Community (mã nguồn mở) | Enterprise (liên hệ) |
 |---|---|---|
 | Scanner (TLS, SSH, VPN, Code) | Có | Có |
+| Flow Analysis (PCAP → HNDL score) | Có | Có |
 | Benchmarker (KEM, Signatures) | Có | Có |
 | Roadmap + Chi phí + Tuân thủ | Có | Có |
 | CLI | Có | Có |
@@ -225,7 +245,11 @@ pip install -e .
 # Quét TLS
 pqc-analyzer scan tls example.vn --port 443
 
-# Tạo lộ trình chuyển đổi
+# Phân tích PCAP (HNDL Radar) — cài thêm extra "flow"
+pip install -e ".[flow]"
+pqc-analyzer scan pcap capture.pcap -o flow_report.json
+
+# Tạo lộ trình chuyển đổi (nhận cả JSON scanner lẫn flow)
 pqc-analyzer roadmap ket_qua.json
 
 # Chạy benchmark
