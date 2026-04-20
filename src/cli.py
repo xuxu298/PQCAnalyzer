@@ -860,7 +860,7 @@ def _risk_icon_for_priority(priority: int) -> str:
 @app.command("version")
 def version() -> None:
     """Show version information."""
-    console.print("[bold]VN-PQC Readiness Analyzer[/bold] v0.3.0")
+    console.print("[bold]VN-PQC Readiness Analyzer[/bold] v0.4.0")
     console.print("https://github.com/xuxu298/PQCAnalyzer")
 
 
