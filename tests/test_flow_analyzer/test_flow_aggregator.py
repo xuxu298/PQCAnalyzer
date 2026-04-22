@@ -32,7 +32,7 @@ def _tls13_hybrid_ch_bytes() -> bytes:
     exts = (
         _sni_ext("api.example.vn")
         + _supported_versions_ext_client([0x0304])
-        + _key_share_client_ext([0x11EB])
+        + _key_share_client_ext([0x11EC])
     )
     return _client_hello(cipher_suites=[0x1302], extensions=exts)
 
@@ -40,7 +40,7 @@ def _tls13_hybrid_ch_bytes() -> bytes:
 def _tls13_hybrid_sh_bytes() -> bytes:
     return _server_hello(
         cipher_suite=0x1302,
-        extensions=_supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EB),
+        extensions=_supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EC),
     )
 
 

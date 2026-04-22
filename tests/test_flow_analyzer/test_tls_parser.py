@@ -109,16 +109,16 @@ def test_parse_client_hello_tls13_hybrid_mlkem() -> None:
     exts = (
         _sni_ext("example.vn")
         + _supported_versions_ext_client([0x0304])
-        + _supported_groups_ext([0x11EB, 0x001D])  # X25519MLKEM768 then x25519
-        + _key_share_client_ext([0x11EB])
+        + _supported_groups_ext([0x11EC, 0x001D])  # X25519MLKEM768 then x25519
+        + _key_share_client_ext([0x11EC])
     )
     payload = _client_hello(cipher_suites=[0x1301, 0x1302], extensions=exts)
     ch = parse_tls_client_hello(payload)
     assert ch is not None
     assert ch.server_name == "example.vn"
     assert 0x0304 in ch.supported_versions
-    assert 0x11EB in ch.supported_groups
-    assert 0x11EB in ch.key_share_groups
+    assert 0x11EC in ch.supported_groups
+    assert 0x11EC in ch.key_share_groups
     assert ch.cipher_suites[:2] == [0x1301, 0x1302]
 
 
@@ -133,13 +133,13 @@ def test_parse_client_hello_classical_tls12() -> None:
 
 
 def test_parse_server_hello_tls13_selects_mlkem() -> None:
-    exts = _supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EB)
+    exts = _supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EC)
     payload = _server_hello(cipher_suite=0x1302, extensions=exts)
     sh = parse_tls_server_hello(payload)
     assert sh is not None
     assert sh.cipher_suite == 0x1302
     assert sh.selected_version == 0x0304
-    assert sh.selected_group == 0x11EB
+    assert sh.selected_group == 0x11EC
 
 
 def test_extract_crypto_fuses_client_and_server() -> None:
@@ -148,12 +148,12 @@ def test_extract_crypto_fuses_client_and_server() -> None:
         extensions=(
             _sni_ext("bank.vn")
             + _supported_versions_ext_client([0x0304])
-            + _key_share_client_ext([0x11EB])
+            + _key_share_client_ext([0x11EC])
         ),
     )
     sh_bytes = _server_hello(
         cipher_suite=0x1302,
-        extensions=_supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EB),
+        extensions=_supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EC),
     )
     ch = parse_tls_client_hello(ch_bytes)
     sh = parse_tls_server_hello(sh_bytes)

@@ -149,8 +149,8 @@ def main() -> None:
     pkts = []
 
     # 1. www.google.com — hybrid X25519MLKEM768 → expect SAFE
-    ch = _client_hello("www.google.com", [0x11EB, 0x001D], [(0x11EB, 1216)])
-    sh = _server_hello(0x11EB, 1120)
+    ch = _client_hello("www.google.com", [0x11EC, 0x001D], [(0x11EC, 1216)])
+    sh = _server_hello(0x11EC, 1120)
     pkts += _flow("10.0.0.10", "198.51.100.10", 40001, 443, ch, sh, seq=1000, pad_to=800_000)
 
     # 2. github.com:443 — classical x25519 → default bucket → expect LOW

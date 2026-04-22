@@ -40,12 +40,12 @@ def _hybrid_tls_bytes() -> tuple[bytes, bytes]:
         extensions=(
             _sni_ext("dichvucong.gov.vn")
             + _supported_versions_ext_client([0x0304])
-            + _key_share_client_ext([0x11EB])
+            + _key_share_client_ext([0x11EC])
         ),
     )
     sh = _server_hello(
         cipher_suite=0x1302,
-        extensions=_supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EB),
+        extensions=_supported_versions_ext_server(0x0304) + _key_share_server_ext(0x11EC),
     )
     return ch, sh
 

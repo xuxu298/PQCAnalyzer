@@ -42,17 +42,18 @@ NAMED_GROUPS: dict[int, str] = {
     0x0100: "ffdhe2048",
     0x0101: "ffdhe3072",
     0x0102: "ffdhe4096",
-    # Hybrid / PQC — draft + IANA-assigned values seen on the wire 2024-2026.
-    # References: draft-ietf-tls-hybrid-design, draft-kwiatkowski-tls-ecdhe-mlkem,
+    # Hybrid / PQC — IANA TLS Supported Groups registry + Chrome draft codepoints.
+    # References: draft-kwiatkowski-tls-ecdhe-mlkem, IANA TLS Parameters 4587/4588,
     # Cloudflare blog 2023-09 + 2024-09, Chrome platform-status.
-    0x11EB: "X25519MLKEM768",            # IANA assignment post-FIPS 203
-    0x11EC: "X25519Kyber768Draft00",     # earlier Cloudflare/Chrome draft
-    0x6399: "SecP256r1Kyber768Draft00",  # Chrome draft
+    0x11EB: "SecP256r1MLKEM768",         # IANA 4587
+    0x11EC: "X25519MLKEM768",            # IANA 4588, post-FIPS 203
+    0x6399: "SecP256r1Kyber768Draft00",  # Chrome pre-standardization draft
     0x639A: "SecP384r1Kyber768Draft00",
 }
 
 HYBRID_PQC_GROUPS = {
     "X25519MLKEM768",
+    "SecP256r1MLKEM768",
     "X25519Kyber768Draft00",
     "SecP256r1Kyber768Draft00",
     "SecP384r1Kyber768Draft00",
