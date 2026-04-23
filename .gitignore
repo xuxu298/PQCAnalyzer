@@ -37,6 +37,9 @@ scan-results/
 output/
 redaction_map.json
 
+# Global PQ Readiness Index — output lives in the separate PQReadinessIndex repo
+ReadinessIndex/
+
 # Environment
 .env
 .env.local
