@@ -12,9 +12,14 @@ ServerHello (or HelloRetryRequest) reveals which group it picked.
 Probes both NIST-track hybrid KEMs:
 - X25519MLKEM768       (IANA 0x11EC) -- shipping at Cloudflare, Google,
                                         AWS as of 2025-2026 (browser default)
-- SecP256r1MLKEM768    (IANA 0x11EB) -- common in FIPS-mode deployments
-                                        and NIST-curve-strict environments
-                                        (banking, US federal)
+- SecP256r1MLKEM768    (IANA 0x11EB) -- preferred in NIST-curve-strict
+                                        environments (US federal procurement
+                                        specs, CNSA-aligned banking estates)
+
+Both are FIPS-approvable under NIST SP 800-227's hybrid-KEM rule: one
+FIPS-validated component (ML-KEM-768 from FIPS 203) is sufficient for
+the combined construction. The choice between the two hybrids is a
+curve-preference decision, not a FIPS gate.
 """
 
 from __future__ import annotations
