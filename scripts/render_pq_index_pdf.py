@@ -15,12 +15,12 @@ from pathlib import Path
 import markdown
 from weasyprint import CSS, HTML
 
-CSS_TEXT = """
+CSS_TEMPLATE = """
 @page {
     size: A4;
     margin: 18mm 16mm 22mm 16mm;
     @bottom-left {
-        content: "Global PQ Readiness Index — April 2026";
+        content: "Global PQ Readiness Index — __LABEL__";
         font-family: "Inter", "Segoe UI", sans-serif;
         font-size: 8pt;
         color: #6b7280;
@@ -162,8 +162,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--output",
-        default="ReadinessIndex/report_2026-04-23.pdf",
-        help="Path for the output PDF",
+        default=None,
+        help="Path for the output PDF (default: same stem as input, .pdf)",
+    )
+    parser.add_argument(
+        "--label",
+        default=None,
+        help="Footer label for the report (default: derived from input filename)",
     )
     args = parser.parse_args()
 
@@ -171,6 +176,18 @@ def main() -> int:
     if not src.exists():
         print(f"Input not found: {src}", file=sys.stderr)
         return 2
+
+    label = args.label
+    if label is None:
+        # Derive "Month YYYY" from filename like report_YYYY-MM-DD.md
+        import re as _re
+        m = _re.search(r"(\d{4})-(\d{2})-(\d{2})", src.stem)
+        if m:
+            from datetime import date as _date
+            d = _date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            label = d.strftime("%B %Y")
+        else:
+            label = "PQ Readiness Index"
 
     md_text = src.read_text(encoding="utf-8")
 
@@ -181,17 +198,21 @@ def main() -> int:
     )
     html_doc = f"""<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Global PQ Readiness Index — April 2026</title></head>
+<head><meta charset="utf-8"><title>Global PQ Readiness Index — {label}</title></head>
 <body>{html_body}</body>
 </html>
 """
 
-    out = Path(args.output).resolve()
+    if args.output is None:
+        out = src.with_suffix(".pdf").resolve()
+    else:
+        out = Path(args.output).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    css_text = CSS_TEMPLATE.replace("__LABEL__", label)
     HTML(string=html_doc, base_url=str(src.parent)).write_pdf(
         target=str(out),
-        stylesheets=[CSS(string=CSS_TEXT)],
+        stylesheets=[CSS(string=css_text)],
     )
     print(f"wrote {out} ({out.stat().st_size // 1024} KB)")
     return 0

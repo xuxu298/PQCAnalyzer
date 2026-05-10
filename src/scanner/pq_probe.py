@@ -9,9 +9,12 @@ Strategy: send one ClientHello offering both the hybrid group and a
 classical control, with key_share entries for both. The server's
 ServerHello (or HelloRetryRequest) reveals which group it picked.
 
-Currently probes:
-- X25519MLKEM768 (IANA 0x11EC) -- the hybrid shipping at Cloudflare,
-  Google, AWS as of 2025.
+Probes both NIST-track hybrid KEMs:
+- X25519MLKEM768       (IANA 0x11EC) -- shipping at Cloudflare, Google,
+                                        AWS as of 2025-2026 (browser default)
+- SecP256r1MLKEM768    (IANA 0x11EB) -- common in FIPS-mode deployments
+                                        and NIST-curve-strict environments
+                                        (banking, US federal)
 """
 
 from __future__ import annotations
@@ -48,6 +51,15 @@ KS_LEN_X25519 = 32
 KS_LEN_X25519_MLKEM768 = 1216  # ML-KEM-768 encaps key (1184) || X25519 (32)
 
 
+# NIST-track PQ hybrid KEMs that this probe treats as PQ-safe when
+# negotiated. Both are MLKEM-768 hybrids and provide equivalent post-quantum
+# security; the choice between them is a server-side curve-policy decision.
+PQ_HYBRID_GROUPS: frozenset[int] = frozenset({
+    GROUP_X25519_MLKEM768,
+    GROUP_SECP256R1_MLKEM768,
+})
+
+
 @dataclass
 class ProbeResult:
     """Outcome of a single PQ-group probe."""
@@ -57,40 +69,48 @@ class ProbeResult:
     error: str | None = None
 
 
-def probe_x25519mlkem768(
+def probe_pq_kem(
     host: str, port: int = 443, timeout: float = 5.0
 ) -> ProbeResult:
-    """Probe whether the server picks X25519MLKEM768 when offered.
+    """Probe whether the server picks any NIST-track PQ hybrid KEM.
 
-    Returns supported=True iff the server's ServerHello (or HRR) selects
-    group 0x11EC. A False with no error means the server preferred the
-    classical control instead of the hybrid -- it does not necessarily
-    prove the server cannot do MLKEM, only that it did not prefer it
-    here.
+    Tests for both X25519MLKEM768 (0x11EC) and SecP256r1MLKEM768 (0x11EB)
+    in a single 2-stage probe. Returns supported=True iff the server's
+    ServerHello (or HRR) selects either hybrid. A False with no error
+    means the server preferred the classical X25519 control over both
+    hybrids -- not proof the server lacks MLKEM, only that it did not
+    prefer it here.
+
+    The result's selected_group field reports which hybrid the server
+    actually picked, so callers can distinguish curve preference.
     """
-    # Stage 1: offer hybrid AND classical X25519 in supported_groups but
-    # only send an X25519 key_share. A server that prefers the hybrid
-    # responds with HelloRetryRequest naming X25519MLKEM768. We avoid
-    # sending a dummy 1216-byte MLKEM key_share because AWS / Google /
-    # Facebook / Fastly / Meta eagerly validate it and close the
-    # connection.
+    # Stage 1: offer both hybrids AND classical X25519 in supported_groups
+    # but only send an X25519 key_share. A server that prefers either
+    # hybrid responds with HelloRetryRequest naming the hybrid it chose.
+    # We avoid sending dummy 1216-byte MLKEM key_shares because AWS /
+    # Google / Facebook / Fastly / Meta eagerly validate them and close
+    # the connection.
     stage1 = _probe_one(
         host, port, timeout,
-        target=GROUP_X25519_MLKEM768,
-        groups=[GROUP_X25519_MLKEM768, GROUP_X25519],
+        target_groups=PQ_HYBRID_GROUPS,
+        groups=[
+            GROUP_X25519_MLKEM768,
+            GROUP_SECP256R1_MLKEM768,
+            GROUP_X25519,
+        ],
         key_shares=[(GROUP_X25519, os.urandom(KS_LEN_X25519))],
     )
     if stage1.supported or stage1.error:
         return stage1
 
-    # Stage 2: server picked X25519 in stage 1 -- it might still support
-    # the hybrid but prefer to skip the HRR round-trip. Re-probe with
-    # ONLY the hybrid in supported_groups and empty key_shares; the
-    # server must either HRR with MLKEM or alert.
+    # Stage 2: server picked X25519 in stage 1 -- might still support a
+    # hybrid but prefer to skip the HRR round-trip. Re-probe with ONLY
+    # the hybrids in supported_groups and empty key_shares; server must
+    # HRR with one hybrid or alert.
     stage2 = _probe_one(
         host, port, timeout,
-        target=GROUP_X25519_MLKEM768,
-        groups=[GROUP_X25519_MLKEM768],
+        target_groups=PQ_HYBRID_GROUPS,
+        groups=[GROUP_X25519_MLKEM768, GROUP_SECP256R1_MLKEM768],
         key_shares=[],
     )
     if stage2.supported:
@@ -98,11 +118,43 @@ def probe_x25519mlkem768(
     return stage1  # surface stage-1 result (selected=X25519) on negative
 
 
+def probe_x25519mlkem768(
+    host: str, port: int = 443, timeout: float = 5.0
+) -> ProbeResult:
+    """Probe whether the server picks X25519MLKEM768 specifically.
+
+    Kept for backwards compatibility with tls_scanner / API routes that
+    distinguish X25519MLKEM768 from SecP256r1MLKEM768. New code should
+    prefer probe_pq_kem() which accepts either hybrid as PQ-safe.
+
+    Returns supported=True iff the server's ServerHello (or HRR) selects
+    group 0x11EC.
+    """
+    stage1 = _probe_one(
+        host, port, timeout,
+        target_groups=frozenset({GROUP_X25519_MLKEM768}),
+        groups=[GROUP_X25519_MLKEM768, GROUP_X25519],
+        key_shares=[(GROUP_X25519, os.urandom(KS_LEN_X25519))],
+    )
+    if stage1.supported or stage1.error:
+        return stage1
+
+    stage2 = _probe_one(
+        host, port, timeout,
+        target_groups=frozenset({GROUP_X25519_MLKEM768}),
+        groups=[GROUP_X25519_MLKEM768],
+        key_shares=[],
+    )
+    if stage2.supported:
+        return stage2
+    return stage1
+
+
 def _probe_one(
     host: str,
     port: int,
     timeout: float,
-    target: int,
+    target_groups: frozenset[int],
     groups: list[int],
     key_shares: list[tuple[int, bytes]],
 ) -> ProbeResult:
@@ -122,7 +174,7 @@ def _probe_one(
             return ProbeResult(None, False, error="server alert (no common params)")
         return ProbeResult(None, False, error="failed to parse ServerHello")
     name = GROUP_NAMES.get(selected, f"unknown(0x{selected:04x})")
-    return ProbeResult(name, selected == target)
+    return ProbeResult(name, selected in target_groups)
 
 
 def _build_client_hello(

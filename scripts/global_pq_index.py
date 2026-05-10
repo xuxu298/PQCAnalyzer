@@ -1,8 +1,14 @@
-"""Run X25519MLKEM768 active probe across the Global PQ Readiness Index target list.
+"""Run NIST-track PQ KEM active probe across the Global PQ Readiness Index target list.
 
 Reads targets from ReadinessIndex/targets.csv, probes each host in parallel using
-the same 2-stage raw ClientHello probe shipped in src/scanner/pq_probe.py, and
-writes timestamped results to ReadinessIndex/results_<ts>.csv.
+the 2-stage raw ClientHello probe shipped in src/scanner/pq_probe.py, and writes
+timestamped results to ReadinessIndex/results_<ts>.csv.
+
+The probe accepts BOTH NIST-track hybrid KEMs as PQ-safe:
+  - X25519MLKEM768       (IANA 0x11EC)  -- browser default
+  - SecP256r1MLKEM768    (IANA 0x11EB)  -- common in FIPS / banking deployments
+
+The negotiated_group column distinguishes which hybrid each PQ-safe host picked.
 
 Usage:
     python3 scripts/global_pq_index.py
@@ -32,7 +38,7 @@ from rich.progress import (
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.scanner.pq_probe import probe_x25519mlkem768  # noqa: E402
+from src.scanner.pq_probe import probe_pq_kem  # noqa: E402
 
 OUT_DIR = ROOT / "ReadinessIndex"
 DEFAULT_TARGETS = OUT_DIR / "targets.csv"
@@ -64,7 +70,7 @@ def probe_one(target: dict, timeout: float) -> dict:
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     try:
-        r = probe_x25519mlkem768(host, timeout=timeout)
+        r = probe_pq_kem(host, timeout=timeout)
         elapsed = (time.perf_counter() - t0) * 1000
         if r.supported:
             status = "PQ-SAFE"
