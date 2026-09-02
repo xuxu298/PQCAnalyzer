@@ -7,7 +7,7 @@
 
 > **NIST has finalized post-quantum standards. Your TLS, SSH, and VPN are running dead algorithms. This tool tells you exactly what to fix, how long it takes, and how much it costs.**
 
-Scan your infrastructure for quantum-vulnerable cryptography. Get a migration roadmap with cost estimates. NIST FIPS 203/204 compliant.
+Scan your infrastructure for quantum-vulnerable cryptography. Get a migration roadmap with cost estimates. Maps findings to NIST FIPS 203/204.
 
 [Tieng Viet](#tieng-viet) | [English](#features)
 
@@ -49,6 +49,8 @@ For government and enterprise clients, we offer additional modules:
 - **Report Generator** — HTML (dark theme), PDF (WeasyPrint), SARIF (CI/CD), Executive Summary
 - **Docker Compose** — Multi-service deployment with web frontend
 - **Custom branding** — Tailored report templates and UI for your organization
+
+Found a bug or have a question? Open an issue: https://github.com/xuxu298/PQCAnalyzer/issues
 
 Contact: **support@vradar.io** for enterprise licensing.
 
@@ -265,18 +267,18 @@ pqc-analyzer benchmark kem --iterations 1000
 | Nhà làm chính sách quản lý | Tổng quan hạ tầng, ngân sách, timeline | JSON (Enterprise: báo cáo điều hành + Web UI) |
 | Nghiên cứu sinh | Reproduce kết quả | Raw data + JSON |
 
+Gặp lỗi hoặc có câu hỏi? Mở một issue: https://github.com/xuxu298/PQCAnalyzer/issues
+
 Liên hệ **support@vradar.io** để sử dụng phiên bản Enterprise.
 
 ---
 
 ## About
 
-PQCAnalyzer is built and maintained by [Nguyen Dong](https://www.linkedin.com/in/dongnx/), founder of **[Vradar.io](https://vradar.io)** — an AI-assisted SOC platform with built-in post-quantum log transport (ML-KEM-768 + ML-DSA-65, FIPS 203/204) for enterprise customers in Vietnam and APAC.
-
-If this tool helped you surface quantum-vulnerable crypto in your infrastructure and your organization needs a commercial SOC with PQC built in from day one, visit **https://vradar.io**.
+PQCAnalyzer is built and maintained by [Nguyen Dong](https://www.linkedin.com/in/dongnx/), founder of **Vradar.io** — an AI-assisted SOC platform with built-in post-quantum log transport (ML-KEM-768 + ML-DSA-65, FIPS 203/204) for enterprise customers in Vietnam and APAC.
 
 For PQCAnalyzer Enterprise (REST API, Web UI, reports, on-prem deploy): **support@vradar.io**.
 
 ---
 
-**Developed by:** [Nguyen Dong](https://www.linkedin.com/in/dongnx/) — Founder of [vradar.io](https://vradar.io) | **License:** MIT
+**Developed by:** [Nguyen Dong](https://www.linkedin.com/in/dongnx/) — Founder of vradar.io | **License:** MIT
