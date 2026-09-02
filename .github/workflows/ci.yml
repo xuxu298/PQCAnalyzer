@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # GIAN GIAO - job nay la tam thoi, PHAI XOA truoc khi lint-xanh vao main.
-  # Hai lop chan de no ⛔0 bao gio chay tren main: dieu kien `if` duoi day,
-  # va viec nhanh chi duoc merge sau khi job nay da bi go bo.
+  # GIAN GIAO - job nay va job `test-sau-fix` deu la tam thoi.
+  # PHAI XOA CA HAI truoc khi lint-xanh vao main. Hai lop chan de chung
+  # ⛔0 bao gio chay tren main: dieu kien `if` o moi job, va luat merge.
   ruff-fix:
     if: github.ref == 'refs/heads/lint-xanh'
     runs-on: ubuntu-latest
@@ -22,14 +22,22 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install ruff
-      - name: TRUOC - thong ke theo ma quy tac
-        run: ruff check src/ tests/ --statistics || true
       - name: chay --fix (chi safe fixes)
         run: ruff check --fix src/ tests/ || true
-      - name: SAU - thong ke theo ma quy tac
-        run: ruff check src/ tests/ --statistics || true
-      - name: SAU - con lai theo file:line:rule
-        run: ruff check --output-format=github src/ tests/ || true
+      - name: ghi BAO CAO ra TEP - doc SAN PHAM, ⛔0 doc log ao hoa
+        run: |
+          {
+            echo "commit-goc: $GITHUB_SHA"
+            echo "run: $GITHUB_RUN_NUMBER"
+            ruff --version
+            echo
+            echo "=== THONG KE THEO MA QUY TAC (sau safe --fix) ==="
+            ruff check src/ tests/ --statistics || true
+            echo
+            echo "=== CHI TIET file:line:rule ==="
+            ruff check src/ tests/ --output-format=concise || true
+          } > ruff-report.txt
+          cat ruff-report.txt
       - name: commit nguoc lai chinh nhanh nay
         run: |
           git config user.name "github-actions[bot]"
@@ -38,10 +46,31 @@ jobs:
           if git diff --staged --quiet; then
             echo "RUFF-FIX: 0 thay doi, ⛔0 commit"
           else
-            git commit -m "ruff check --fix src/ tests/ (may go - gian giao)"
+            git commit -m "ruff --fix + bao cao (may go - gian giao)"
             git push
             echo "RUFF-FIX: DA DAY"
           fi
+
+  # LUOI AN TOAN TU LEN NONG LAI. Ly do ton tai, do vong 85:
+  # cu day cua github-actions[bot] ⛔0 de ra run nao (run #33: total=1, ca 5 job
+  # deu mang sha TRUOC khi sua). Nen job `test` duoi kia cham code CU.
+  # Job nay checkout HEAD MOI cua nhanh SAU cu commit cua bot ⇒ no cham code THAT.
+  test-sau-fix:
+    needs: ruff-fix
+    if: github.ref == 'refs/heads/lint-xanh'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: lint-xanh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev,flow]"
+      - run: pytest --cov=src --cov-report=xml -v -m "not integration"
 
   lint:
     runs-on: ubuntu-latest
