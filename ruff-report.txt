@@ -1,0 +1,151 @@
+commit-goc: 893a53ea27fbe76073e09e72838b3e4095dc70fe
+run: 34
+ruff 0.16.5
+
+=== THONG KE THEO MA QUY TAC (sau safe --fix) ===
+86	E501  	line-too-long
+ 9	TC003 	typing-only-standard-library-import
+ 6	SIM102	collapsible-if
+ 6	TC001 	typing-only-first-party-import
+ 6	F841  	unused-variable
+ 4	B023  	function-uses-loop-variable
+ 3	SIM105	suppressible-exception
+ 3	F401  	unused-import
+ 2	SIM117	multiple-with-statements
+ 1	B017  	assert-raises-exception
+ 1	N818  	error-suffix-on-exception-name
+ 1	B007  	unused-loop-control-variable
+Found 128 errors.
+No fixes available (28 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+=== CHI TIET file:line:rule ===
+src/benchmarker/hardware_profile.py:29:9: SIM105 Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+src/benchmarker/hardware_profile.py:43:13: SIM105 Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+src/benchmarker/keygen_bench.py:36:63: F401 `cryptography.hazmat.primitives.asymmetric.dh` imported but unused; consider using `importlib.util.find_spec` to test for availability
+src/benchmarker/keygen_bench.py:57:101: E501 Line too long (103 > 100)
+src/benchmarker/keygen_bench.py:96:101: E501 Line too long (103 > 100)
+src/benchmarker/keygen_bench.py:121:101: E501 Line too long (101 > 100)
+src/benchmarker/keygen_bench.py:163:46: B023 Function definition does not bind loop variable `actual_name`
+src/benchmarker/keygen_bench.py:268:39: B023 Function definition does not bind loop variable `actual_name`
+src/benchmarker/sign_bench.py:14:101: E501 Line too long (104 > 100)
+src/benchmarker/sign_bench.py:25:90: F401 `cryptography.hazmat.primitives.asymmetric.utils` imported but unused; consider using `importlib.util.find_spec` to test for availability
+src/benchmarker/sign_bench.py:61:101: E501 Line too long (103 > 100)
+src/benchmarker/sign_bench.py:89:101: E501 Line too long (103 > 100)
+src/benchmarker/sign_bench.py:117:101: E501 Line too long (101 > 100)
+src/benchmarker/throughput_bench.py:28:63: F401 `cryptography.hazmat.primitives.asymmetric.ec` imported but unused; consider using `importlib.util.find_spec` to test for availability
+src/benchmarker/throughput_bench.py:35:101: E501 Line too long (105 > 100)
+src/benchmarker/throughput_bench.py:84:46: B023 Function definition does not bind loop variable `actual_name`
+src/benchmarker/throughput_bench.py:84:72: B023 Function definition does not bind loop variable `pub`
+src/benchmarker/tls_handshake_bench.py:127:101: E501 Line too long (105 > 100)
+src/benchmarker/tls_handshake_bench.py:133:101: E501 Line too long (111 > 100)
+src/cli.py:21:101: E501 Line too long (111 > 100)
+src/cli.py:30:101: E501 Line too long (102 > 100)
+src/cli.py:123:101: E501 Line too long (143 > 100)
+src/cli.py:144:101: E501 Line too long (122 > 100)
+src/cli.py:145:101: E501 Line too long (101 > 100)
+src/cli.py:147:101: E501 Line too long (109 > 100)
+src/cli.py:152:101: E501 Line too long (116 > 100)
+src/cli.py:227:101: E501 Line too long (110 > 100)
+src/cli.py:247:101: E501 Line too long (113 > 100)
+src/cli.py:321:101: E501 Line too long (101 > 100)
+src/cli.py:340:101: E501 Line too long (139 > 100)
+src/cli.py:349:101: E501 Line too long (138 > 100)
+src/cli.py:457:101: E501 Line too long (110 > 100)
+src/cli.py:478:101: E501 Line too long (132 > 100)
+src/cli.py:533:101: E501 Line too long (103 > 100)
+src/cli.py:548:101: E501 Line too long (112 > 100)
+src/cli.py:601:101: E501 Line too long (103 > 100)
+src/cli.py:616:101: E501 Line too long (112 > 100)
+src/cli.py:633:101: E501 Line too long (101 > 100)
+src/cli.py:668:101: E501 Line too long (103 > 100)
+src/cli.py:681:101: E501 Line too long (121 > 100)
+src/cli.py:762:101: E501 Line too long (101 > 100)
+src/cli.py:763:101: E501 Line too long (108 > 100)
+src/cli.py:808:5: F841 Local variable `timeline` is assigned to but never used
+src/cli.py:833:101: E501 Line too long (113 > 100)
+src/cli.py:834:101: E501 Line too long (125 > 100)
+src/cli.py:839:101: E501 Line too long (109 > 100)
+src/cli.py:841:101: E501 Line too long (110 > 100)
+src/cli.py:849:101: E501 Line too long (113 > 100)
+src/cli.py:885:13: B007 Loop control variable `name` not used within loop body
+src/flow_analyzer/flow_aggregator.py:5:29: TC003 Move standard library import `collections.abc.Iterable` into a type-checking block
+src/flow_analyzer/flow_aggregator.py:5:39: TC003 Move standard library import `collections.abc.Iterator` into a type-checking block
+src/flow_analyzer/handshake_parser/ssh_parser.py:188:101: E501 Line too long (101 > 100)
+src/flow_analyzer/handshake_parser/tls_parser.py:157:7: N818 Exception name `_ShortBuffer` should be named with an Error suffix
+src/flow_analyzer/handshake_parser/tls_parser.py:292:9: SIM102 Use a single `if` statement instead of nested `if` statements
+src/flow_analyzer/models.py:5:22: TC003 Move standard library import `datetime.datetime` into a type-checking block
+src/flow_analyzer/pcap_reader.py:13:29: TC003 Move standard library import `collections.abc.Iterator` into a type-checking block
+src/flow_analyzer/pcap_reader.py:180:9: SIM102 Use a single `if` statement instead of nested `if` statements
+src/flow_analyzer/pcap_reader.py:188:9: SIM102 Use a single `if` statement instead of nested `if` statements
+src/flow_analyzer/reporter.py:173:101: E501 Line too long (106 > 100)
+src/flow_analyzer/reporter.py:174:101: E501 Line too long (113 > 100)
+src/roadmap/compliance_checker.py:6:32: TC001 Move application import `src.scanner.models.Finding` into a type-checking block
+src/roadmap/compliance_checker.py:95:101: E501 Line too long (105 > 100)
+src/roadmap/priority_engine.py:6:40: TC001 Move application import `src.roadmap.recommendation.Recommendation` into a type-checking block
+src/roadmap/priority_engine.py:7:32: TC001 Move application import `src.scanner.models.Finding` into a type-checking block
+src/roadmap/priority_engine.py:21:101: E501 Line too long (115 > 100)
+src/roadmap/priority_engine.py:27:101: E501 Line too long (119 > 100)
+src/roadmap/priority_engine.py:33:101: E501 Line too long (123 > 100)
+src/roadmap/recommendation.py:7:32: TC001 Move application import `src.scanner.models.Finding` into a type-checking block
+src/roadmap/recommendation.py:246:101: E501 Line too long (105 > 100)
+src/roadmap/risk_scorer.py:6:32: TC001 Move application import `src.scanner.models.Finding` into a type-checking block
+src/roadmap/timeline_generator.py:8:32: TC001 Move application import `src.roadmap.models.MigrationPhase` into a type-checking block
+src/scanner/config_parser.py:69:9: SIM102 Use a single `if` statement instead of nested `if` statements
+src/scanner/config_parser.py:92:9: F841 Local variable `db` is assigned to but never used
+src/scanner/config_parser.py:224:9: F841 Local variable `db` is assigned to but never used
+src/scanner/config_parser.py:288:13: SIM102 Use a single `if` statement instead of nested `if` statements
+src/scanner/ssh_scanner.py:58:101: E501 Line too long (114 > 100)
+src/scanner/ssh_scanner.py:77:101: E501 Line too long (114 > 100)
+src/scanner/ssh_scanner.py:86:101: E501 Line too long (101 > 100)
+src/scanner/ssh_scanner.py:228:101: E501 Line too long (102 > 100)
+src/scanner/ssh_scanner.py:263:101: E501 Line too long (103 > 100)
+src/scanner/ssh_scanner.py:289:101: E501 Line too long (127 > 100)
+src/scanner/tls_scanner.py:92:13: SIM105 Use `contextlib.suppress(ssl.SSLError, ValueError)` instead of `try`-`except`-`pass`
+src/scanner/tls_scanner.py:103:9: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+src/scanner/tls_scanner.py:124:17: F841 Local variable `cert_bin` is assigned to but never used
+src/scanner/tls_scanner.py:255:17: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+src/scanner/tls_scanner.py:340:9: F841 Local variable `db` is assigned to but never used
+src/scanner/tls_scanner.py:349:9: F841 Local variable `issuer` is assigned to but never used
+src/scanner/vpn_scanner.py:24:101: E501 Line too long (106 > 100)
+src/scanner/vpn_scanner.py:27:101: E501 Line too long (101 > 100)
+src/scanner/vpn_scanner.py:59:101: E501 Line too long (113 > 100)
+src/scanner/vpn_scanner.py:60:101: E501 Line too long (105 > 100)
+src/scanner/vpn_scanner.py:83:101: E501 Line too long (102 > 100)
+src/scanner/vpn_scanner.py:84:101: E501 Line too long (113 > 100)
+src/scanner/vpn_scanner.py:85:101: E501 Line too long (113 > 100)
+src/scanner/vpn_scanner.py:86:101: E501 Line too long (107 > 100)
+src/scanner/vpn_scanner.py:87:101: E501 Line too long (107 > 100)
+src/scanner/vpn_scanner.py:88:101: E501 Line too long (108 > 100)
+src/scanner/vpn_scanner.py:89:101: E501 Line too long (108 > 100)
+src/scanner/vpn_scanner.py:90:101: E501 Line too long (126 > 100)
+src/scanner/vpn_scanner.py:91:101: E501 Line too long (104 > 100)
+src/scanner/vpn_scanner.py:92:101: E501 Line too long (104 > 100)
+src/scanner/vpn_scanner.py:93:101: E501 Line too long (105 > 100)
+src/scanner/vpn_scanner.py:94:101: E501 Line too long (108 > 100)
+src/scanner/vpn_scanner.py:105:101: E501 Line too long (101 > 100)
+src/scanner/vpn_scanner.py:185:9: SIM102 Use a single `if` statement instead of nested `if` statements
+src/scanner/vpn_scanner.py:186:101: E501 Line too long (117 > 100)
+src/scanner/vpn_scanner.py:301:101: E501 Line too long (102 > 100)
+src/scanner/vpn_scanner.py:315:101: E501 Line too long (103 > 100)
+src/scanner/vpn_scanner.py:384:101: E501 Line too long (119 > 100)
+src/scanner/vpn_scanner.py:464:101: E501 Line too long (117 > 100)
+src/scanner/vpn_scanner.py:531:101: E501 Line too long (104 > 100)
+src/scanner/vpn_scanner.py:579:101: E501 Line too long (104 > 100)
+src/utils/crypto_db.py:8:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+src/utils/i18n.py:158:101: E501 Line too long (116 > 100)
+src/utils/i18n.py:159:101: E501 Line too long (115 > 100)
+tests/test_flow_analyzer/test_data_classifier.py:6:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+tests/test_flow_analyzer/test_integration.py:6:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+tests/test_flow_analyzer/test_integration.py:34:101: E501 Line too long (101 > 100)
+tests/test_flow_analyzer/test_integration.py:98:101: E501 Line too long (101 > 100)
+tests/test_flow_analyzer/test_integration.py:103:101: E501 Line too long (103 > 100)
+tests/test_flow_analyzer/test_models.py:65:10: B017 Do not assert blind exception: `Exception`
+tests/test_flow_analyzer/test_pcap_reader.py:9:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+tests/test_flow_analyzer/test_roadmap_adapter.py:6:21: TC003 Move standard library import `pathlib.Path` into a type-checking block
+tests/test_flow_analyzer/test_roadmap_adapter.py:101:101: E501 Line too long (118 > 100)
+tests/test_roadmap/test_priority_engine.py:97:101: E501 Line too long (104 > 100)
+tests/test_scanner/test_code_scanner.py:23:101: E501 Line too long (103 > 100)
+tests/test_scanner/test_code_scanner.py:57:101: E501 Line too long (104 > 100)
+tests/test_scanner/test_vpn_scanner.py:165:101: E501 Line too long (116 > 100)
+Found 128 errors.
+No fixes available (28 hidden fixes can be enabled with the `--unsafe-fixes` option).
