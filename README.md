@@ -205,6 +205,8 @@ pytest --cov=src --cov-report=html # With coverage
 pytest -m "not integration"        # Skip network tests
 ```
 
+**257 tests** under the selection CI runs (`-m "not integration"`, excluding `tests/test_reporter`), counted on 2026-09-02.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
