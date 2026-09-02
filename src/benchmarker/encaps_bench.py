@@ -18,8 +18,8 @@ def bench_kem_encaps_classical(
     results: list[KEMBenchmarkResult] = []
 
     try:
-        from cryptography.hazmat.primitives.asymmetric import rsa, padding, ec
         from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
         from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
         # RSA-2048 encrypt/decrypt (simulating KEM via OAEP)

@@ -18,7 +18,7 @@ from src.scanner.models import (
     TLSInfo,
 )
 from src.scanner.pq_probe import probe_x25519mlkem768
-from src.utils.constants import RiskLevel, ScanType, TLS_VERSIONS
+from src.utils.constants import TLS_VERSIONS, RiskLevel, ScanType
 from src.utils.crypto_db import get_algorithm_db
 from src.utils.i18n import t
 
@@ -56,7 +56,7 @@ class TLSScanner:
                 "cipher_suite": tls_info.cipher_suite,
                 "supported_protocols": tls_info.supported_protocols,
             }
-        except socket.timeout:
+        except TimeoutError:
             result.status = ScanStatus.TIMEOUT
             result.error_message = t(
                 "scan_timeout", target=target, timeout=self.config.timeout_ms

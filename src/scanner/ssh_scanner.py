@@ -8,7 +8,6 @@ from pathlib import Path
 
 from src.scanner.models import Finding, ScanResult, ScanStatus
 from src.utils.constants import RiskLevel, ScanType
-from src.utils.crypto_db import get_algorithm_db
 
 logger = logging.getLogger(__name__)
 

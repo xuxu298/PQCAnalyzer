@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from src.scanner.models import Finding, ScanResult, ScanSummary
 from src.utils.constants import RiskLevel, ScanStatus, ScanType
 

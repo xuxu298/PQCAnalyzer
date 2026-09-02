@@ -33,7 +33,7 @@ def bench_kem_keygen_classical(
     results: list[KEMBenchmarkResult] = []
 
     try:
-        from cryptography.hazmat.primitives.asymmetric import rsa, ec, dh
+        from cryptography.hazmat.primitives.asymmetric import dh, ec, rsa
 
         # RSA-2048
         try:
@@ -43,7 +43,12 @@ def bench_kem_keygen_classical(
             )
             key = rsa.generate_private_key(65537, 2048)
             pub = key.public_key()
-            from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
+            from cryptography.hazmat.primitives.serialization import (
+                Encoding,
+                NoEncryption,
+                PrivateFormat,
+                PublicFormat,
+            )
             results.append(KEMBenchmarkResult(
                 algorithm="RSA-2048",
                 iterations=iterations,
@@ -77,7 +82,12 @@ def bench_kem_keygen_classical(
             )
             key = ec.generate_private_key(ec.SECP256R1())
             pub = key.public_key()
-            from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
+            from cryptography.hazmat.primitives.serialization import (
+                Encoding,
+                NoEncryption,
+                PrivateFormat,
+                PublicFormat,
+            )
             results.append(KEMBenchmarkResult(
                 algorithm="ECDH-P256",
                 iterations=iterations,
@@ -97,7 +107,12 @@ def bench_kem_keygen_classical(
             )
             key = X25519PrivateKey.generate()
             pub = key.public_key()
-            from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
+            from cryptography.hazmat.primitives.serialization import (
+                Encoding,
+                NoEncryption,
+                PrivateFormat,
+                PublicFormat,
+            )
             results.append(KEMBenchmarkResult(
                 algorithm="X25519",
                 iterations=iterations,
@@ -171,7 +186,7 @@ def bench_sign_keygen_classical(
     results: list[SignBenchmarkResult] = []
 
     try:
-        from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519
+        from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 
         # RSA-2048 Sign
         try:

@@ -168,7 +168,7 @@ def _probe_one(
         with socket.create_connection((host, port), timeout=timeout) as sock:
             sock.sendall(ch)
             record = _read_record(sock)
-    except (socket.timeout, OSError) as exc:
+    except (TimeoutError, OSError) as exc:
         return ProbeResult(None, False, error=str(exc))
 
     if not record:

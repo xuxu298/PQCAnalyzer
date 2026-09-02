@@ -1,8 +1,7 @@
 """Tests for hardware profiling."""
 
-import pytest
 
-from src.benchmarker.hardware_profile import detect_hardware, HARDWARE_PROFILES
+from src.benchmarker.hardware_profile import HARDWARE_PROFILES, detect_hardware
 
 
 class TestHardwareDetection:

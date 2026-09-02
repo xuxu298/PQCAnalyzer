@@ -1,6 +1,5 @@
 """Tests for benchmarker data models."""
 
-import pytest
 
 from src.benchmarker.models import (
     BenchmarkReport,

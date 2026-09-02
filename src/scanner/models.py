@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from src.utils.constants import StrEnum
 from uuid import uuid4
 
-from src.utils.constants import RiskLevel, ScanStatus, ScanType
+from src.utils.constants import RiskLevel, ScanStatus, ScanType, StrEnum
 
 
 @dataclass

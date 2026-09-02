@@ -8,7 +8,7 @@ import pytest
 
 from src.scanner.inventory import CryptoInventory
 from src.scanner.models import Finding, ScanResult
-from src.utils.constants import RiskLevel, ScanStatus, ScanType
+from src.utils.constants import RiskLevel, ScanType
 
 
 @pytest.fixture

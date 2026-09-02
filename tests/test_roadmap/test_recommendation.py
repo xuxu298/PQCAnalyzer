@@ -1,6 +1,5 @@
 """Tests for recommendation engine."""
 
-import pytest
 
 from src.roadmap.recommendation import recommend, recommend_all
 from src.scanner.models import Finding

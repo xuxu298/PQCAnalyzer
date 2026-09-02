@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +58,10 @@ def bench_tls_handshake_classical(
     results: list[HandshakeResult] = []
 
     try:
-        from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding, ed25519
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
         from cryptography.hazmat.primitives.asymmetric.ec import ECDH
         from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
-        from cryptography.hazmat.primitives import hashes
 
         msg = b"TLS handshake test"
 

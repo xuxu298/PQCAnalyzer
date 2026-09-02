@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import platform
 import re
-import sys
 from pathlib import Path
 
 from src.benchmarker.models import HardwareInfo

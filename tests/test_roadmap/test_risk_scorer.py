@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.roadmap.risk_scorer import score_finding, score_findings, VULNERABILITY_WEIGHTS
+from src.roadmap.risk_scorer import VULNERABILITY_WEIGHTS, score_finding, score_findings
 from src.scanner.models import Finding
 from src.utils.constants import RiskLevel
 

@@ -24,8 +24,8 @@ def bench_kem_throughput_classical(duration: float = 5.0) -> dict[str, float]:
     results: dict[str, float] = {}
 
     try:
-        from cryptography.hazmat.primitives.asymmetric import rsa, padding, ec
         from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
         from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
         # RSA-2048 encrypt ops/sec

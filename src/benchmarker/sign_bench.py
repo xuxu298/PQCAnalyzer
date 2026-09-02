@@ -21,9 +21,14 @@ def bench_sign_classical(
     results: list[SignBenchmarkResult] = []
 
     try:
-        from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, padding, utils
         from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
+        from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa, utils
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding,
+            NoEncryption,
+            PrivateFormat,
+            PublicFormat,
+        )
 
         # RSA-2048 Sign/Verify
         try:

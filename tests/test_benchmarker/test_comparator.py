@@ -9,7 +9,6 @@ from src.benchmarker.comparator import (
 )
 from src.benchmarker.models import (
     BenchmarkReport,
-    ComparisonResult,
     HardwareInfo,
     KEMBenchmarkResult,
     SignBenchmarkResult,

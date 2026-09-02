@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from src.roadmap.models import CostEstimate, MigrationPhase
 
-
 # Effort matrix (from spec)
 EFFORT_MATRIX: dict[str, dict[str, str | int]] = {
     "tls_config_update": {"person_hours": 4, "risk": "low", "downtime": "0"},

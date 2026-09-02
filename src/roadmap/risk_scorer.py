@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from src.scanner.models import Finding
 from src.roadmap.models import RiskScore
+from src.scanner.models import Finding
 from src.utils.constants import RiskLevel
-
 
 # Vulnerability weights by risk level
 VULNERABILITY_WEIGHTS: dict[RiskLevel, int] = {

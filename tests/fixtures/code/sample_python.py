@@ -1,8 +1,8 @@
 # Sample Python file with crypto usage
 import hashlib
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric import ec
-from Crypto.PublicKey import RSA
+
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+
 
 def generate_rsa_key():
     private_key = rsa.generate_private_key(65537, 2048)

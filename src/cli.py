@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -29,7 +28,7 @@ console = Console()
 
 # Common options
 VerboseOption = Annotated[int, typer.Option("--verbose", "-v", count=True, help="Increase verbosity")]
-OutputOption = Annotated[Optional[str], typer.Option("--output", "-o", help="Output file path")]
+OutputOption = Annotated[str | None, typer.Option("--output", "-o", help="Output file path")]
 LanguageOption = Annotated[str, typer.Option("--language", "-l", help="Language: en or vi")]
 RedactOption = Annotated[bool, typer.Option("--redact", help="Redact hostnames/IPs in output")]
 
@@ -142,7 +141,7 @@ def _save_output(data: dict, output_path: str | None) -> None:
 @scan_app.command("tls")
 def scan_tls(
     targets: Annotated[list[str], typer.Argument(help="Host:port targets to scan")],
-    hosts_file: Annotated[Optional[str], typer.Option("--hosts-file", "-f", help="File with targets (one per line)")] = None,
+    hosts_file: Annotated[str | None, typer.Option("--hosts-file", "-f", help="File with targets (one per line)")] = None,
     timeout: Annotated[int, typer.Option("--timeout", "-t", help="Connection timeout in ms")] = 5000,
     delay: Annotated[int, typer.Option("--delay", help="Delay between requests in ms")] = 100,
     max_concurrent: Annotated[int, typer.Option("--max-concurrent", help="Max concurrent connections")] = 10,
@@ -367,10 +366,10 @@ def scan_vpn(
 def scan_pcap(
     path: Annotated[str, typer.Argument(help="Path to .pcap or .pcapng file")],
     sensitivity_map: Annotated[
-        Optional[str], typer.Option("--sensitivity-map", help="YAML rules file to override defaults")
+        str | None, typer.Option("--sensitivity-map", help="YAML rules file to override defaults")
     ] = None,
     bpf_filter: Annotated[
-        Optional[str], typer.Option("--filter", help="BPF-like filter (tcp port 443, udp, host X)")
+        str | None, typer.Option("--filter", help="BPF-like filter (tcp port 443, udp, host X)")
     ] = None,
     output: OutputOption = None,
     verbose: VerboseOption = 0,
@@ -679,7 +678,7 @@ def bench_all(
     bench_sign(iterations=iterations, warmup=warmup, output=None, verbose=verbose)
 
     if output:
-        console.print(f"\n[green]Note: Use 'benchmark kem -o' or 'benchmark sign -o' to save individual results.[/green]")
+        console.print("\n[green]Note: Use 'benchmark kem -o' or 'benchmark sign -o' to save individual results.[/green]")
 
 
 @bench_app.command("hardware")
@@ -760,8 +759,8 @@ def _merge_sign_results(sign_results: list, keygen_results: list) -> list:
 def generate_roadmap(
     scan_results: Annotated[str, typer.Argument(help="Path to scan results JSON file")],
     organization: Annotated[str, typer.Option("--org", help="Organization name")] = "",
-    exposure: Annotated[Optional[int], typer.Option("--exposure", help="Exposure factor (1-3)")] = None,
-    sensitivity: Annotated[Optional[int], typer.Option("--sensitivity", help="Data sensitivity (1-5)")] = None,
+    exposure: Annotated[int | None, typer.Option("--exposure", help="Exposure factor (1-3)")] = None,
+    sensitivity: Annotated[int | None, typer.Option("--sensitivity", help="Data sensitivity (1-5)")] = None,
     output: OutputOption = None,
     language: LanguageOption = "en",
     verbose: VerboseOption = 0,

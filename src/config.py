@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 DEFAULT_TIMEOUT_MS = 5000
 DEFAULT_DELAY_MS = 100
 DEFAULT_MAX_CONCURRENT = 10
