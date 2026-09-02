@@ -1,5 +1,5 @@
-commit-goc: 7e246a684a4295c28429be87c688cc4e139d4b0c
-run: 35
+commit-goc: eb0c6b7687dbb1d42bd0009b765767ef9618c0c7
+run: 36
 ruff 0.16.5
 
 === THONG KE THEO MA QUY TAC (sau safe --fix) ===
