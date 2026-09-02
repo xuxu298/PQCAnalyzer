@@ -93,6 +93,16 @@ packages = ["src"]
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+# Files under tests/fixtures/ are scanner INPUT, not our own code. They carry
+# deliberate crypto anti-patterns that the test suite asserts on, so linting
+# them lints the question instead of the answer.
+# Measured 2026-09-02: `ruff check --fix` deleted `from Crypto.PublicKey import RSA`
+# as F401-unused from tests/fixtures/code/sample_python.py -- exactly the evidence
+# test_finds_rsa_import and test_finds_pycryptodome_rsa look for. Both then
+# asserted 0 > 0 (run #34, 2 failed / 254 passed / 1 skipped).
+# Scope is exactly tests/fixtures/ -- not tests/, not tests/test_*. No rule is
+# disabled and no threshold is loosened: `ruff check src/` is unchanged by this.
+extend-exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "TCH"]
