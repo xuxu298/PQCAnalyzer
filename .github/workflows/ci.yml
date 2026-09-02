@@ -2,11 +2,47 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, lint-xanh]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
+  # GIAN GIAO - job nay la tam thoi, PHAI XOA truoc khi lint-xanh vao main.
+  # Hai lop chan de no ⛔0 bao gio chay tren main: dieu kien `if` duoi day,
+  # va viec nhanh chi duoc merge sau khi job nay da bi go bo.
+  ruff-fix:
+    if: github.ref == 'refs/heads/lint-xanh'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - name: TRUOC - thong ke theo ma quy tac
+        run: ruff check src/ tests/ --statistics || true
+      - name: chay --fix (chi safe fixes)
+        run: ruff check --fix src/ tests/ || true
+      - name: SAU - thong ke theo ma quy tac
+        run: ruff check src/ tests/ --statistics || true
+      - name: SAU - con lai theo file:line:rule
+        run: ruff check --output-format=github src/ tests/ || true
+      - name: commit nguoc lai chinh nhanh nay
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "RUFF-FIX: 0 thay doi, ⛔0 commit"
+          else
+            git commit -m "ruff check --fix src/ tests/ (may go - gian giao)"
+            git push
+            echo "RUFF-FIX: DA DAY"
+          fi
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -29,7 +65,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       # [flow] pulls PyYAML, required by tests/test_flow_analyzer/test_data_classifier.py
       - run: pip install -e ".[dev,flow]"
-      - run: pytest --cov=src --cov-report=xml -v -m "not integration" --ignore=tests/test_reporter
+      # `--ignore=tests/test_reporter` da bo: duong dan do ⛔0 ton tai trong kho
+      # (tep that la tests/test_flow_analyzer/test_reporter.py) nen co ay la no-op.
+      # Bo mot no-op ⛔0 doi gi duoc do ⇒ so 257 van dung.
+      - run: pytest --cov=src --cov-report=xml -v -m "not integration"
       - uses: codecov/codecov-action@v4
         if: matrix.python-version == '3.11'
         with:
