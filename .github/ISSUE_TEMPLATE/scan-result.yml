@@ -22,7 +22,7 @@ body:
     id: estate
     attributes:
       label: What you pointed it at
-      description: One line. Example: "3 public web endpoints plus one OpenVPN config, small ISP."
+      description: 'One line. Example: "3 public web endpoints plus one OpenVPN config, small ISP."'
     validations:
       required: true
   - type: dropdown
