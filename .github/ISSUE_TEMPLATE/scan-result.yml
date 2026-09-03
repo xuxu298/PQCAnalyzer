@@ -1,0 +1,43 @@
+name: Scan result
+description: You ran a scan and got a number. Paste it here.
+title: "[scan] "
+labels: ["scan-result"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is not a bug report. If the tool ran and told you something about your own
+        infrastructure, this is the right place — including when the answer was "everything
+        here is already SAFE". Redact hostnames freely; the finding types, the key exchanges
+        and the risk levels are what carry the information.
+  - type: textarea
+    id: output
+    attributes:
+      label: What the scan said
+      description: Paste the roadmap summary block, or results.json with hostnames removed.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: estate
+    attributes:
+      label: What you pointed it at
+      description: One line. Example: "3 public web endpoints plus one OpenVPN config, small ISP."
+    validations:
+      required: true
+  - type: dropdown
+    id: matched
+    attributes:
+      label: Did the result match what you expected?
+      options:
+        - Yes, it confirmed what I already believed
+        - No, it found something I did not know was there
+        - No, I think it got something wrong
+        - Not enough context yet to say
+    validations:
+      required: true
+  - type: textarea
+    id: next
+    attributes:
+      label: What will you do with it? (optional)
+      description: Skip this if you do not know yet. That is a real answer too.
