@@ -4,6 +4,11 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/xuxu298/PQCAnalyzer?style=social)](https://github.com/xuxu298/PQCAnalyzer)
+[![Lint](https://github.com/xuxu298/PQCAnalyzer/actions/workflows/lint.yml/badge.svg)](https://github.com/xuxu298/PQCAnalyzer/actions/workflows/lint.yml)
+
+`Lint` is red on purpose. `ruff check src/ tests/` reported 170 findings on CI run #39 (2026-09-03). Nobody is scheduled to clear them, so the badge stays red until somebody is. 37 of the 170 are auto-fixable with `ruff check --fix`. That is the cheapest first patch here.
+
+What `CI` covers, so the green means something: `pip install -e ".[dev,flow]"` then `pytest` on Python 3.10, 3.11 and 3.12. It excludes tests marked `integration` and the whole `tests/test_reporter` directory.
 
 > **NIST has finalized post-quantum standards. Your TLS, SSH, and VPN are running dead algorithms. This tool tells you exactly what to fix, how long it takes, and how much it costs.**
 
