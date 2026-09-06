@@ -6,7 +6,21 @@
 [![GitHub stars](https://img.shields.io/github/stars/xuxu298/PQCAnalyzer?style=social)](https://github.com/xuxu298/PQCAnalyzer)
 [![Lint](https://github.com/xuxu298/PQCAnalyzer/actions/workflows/lint.yml/badge.svg)](https://github.com/xuxu298/PQCAnalyzer/actions/workflows/lint.yml)
 
-`Lint` is red on purpose. `ruff check src/ tests/` reported 170 findings on CI run #39 (2026-09-03). Nobody is scheduled to clear them, so the badge stays red until somebody is. 37 of the 170 are auto-fixable with `ruff check --fix`. That is the cheapest first patch here.
+## Lint status
+
+Lint is red, and we are not hiding it. This repo enables ruff with a rule set it has never fully satisfied — the badge has been failing on every run, not since a regression. All three runs of the workflow have failed.
+
+Current count, produced by the exact command below, on Lint run #3, commit dd3f343, 2026-09-05:
+
+```
+$ ruff check src/ tests/
+Found 170 errors.
+[*] 37 fixable with the `--fix` option (28 hidden fixes can be enabled with the `--unsafe-fixes` option).
+```
+
+For the per-rule breakdown, run `ruff check --statistics src/ tests/` and read it off your own machine rather than off this page.
+
+We publish this number instead of turning the gate off, for the same reason we publish the techniques a default SIEM does not alert on: a number you can reproduce is worth more than a green badge you cannot.
 
 What `CI` covers, so the green means something: `pip install -e ".[dev,flow]"` then `pytest` on Python 3.10, 3.11 and 3.12. It excludes tests marked `integration` and the whole `tests/test_reporter` directory.
 
