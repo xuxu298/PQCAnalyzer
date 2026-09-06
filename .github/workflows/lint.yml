@@ -15,4 +15,5 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install ruff
+      - run: ruff --version
       - run: ruff check src/ tests/
