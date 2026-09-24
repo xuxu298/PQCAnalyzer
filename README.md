@@ -8,9 +8,9 @@
 
 ## Lint status
 
-Lint is red, and we are not hiding it. This repo enables ruff with a rule set it has never fully satisfied — the badge has been failing on every run, not since a regression. All three runs of the workflow have failed.
+Lint is red, and we are not hiding it. This repo enables ruff with a rule set it has never fully satisfied — the badge has been failing on every run, not since a regression. All six runs of the workflow (#1–#6) have failed.
 
-Current count, produced by the exact command below, on Lint run #3, commit dd3f343, 2026-09-05:
+Current count, produced by the exact command below, on Lint run #6, commit 6181ad8, 2026-09-06 (ruff 0.16.6, as pinned in CI), unchanged since run #3:
 
 ```
 $ ruff check src/ tests/
