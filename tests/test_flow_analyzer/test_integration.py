@@ -14,11 +14,8 @@ from src.flow_analyzer.models import RiskBand
 from src.flow_analyzer.pcap_reader import read_pcap
 from src.flow_analyzer.reporter import generate_report, render_json
 
-scapy = pytest.importorskip("scapy")
-from scapy.layers.inet import IP, TCP  # noqa: E402
-from scapy.layers.l2 import Ether  # noqa: E402
-from scapy.utils import wrpcap  # noqa: E402
-
+pytest.importorskip("dpkt")
+from tests.test_flow_analyzer.pcap_helpers import ether, ip_tcp, write_pcap  # noqa: E402
 from tests.test_flow_analyzer.test_tls_parser import (  # noqa: E402
     _client_hello,
     _key_share_client_ext,
@@ -30,8 +27,8 @@ from tests.test_flow_analyzer.test_tls_parser import (  # noqa: E402
 )
 
 
-def _pkt(src_ip: str, dst_ip: str, sport: int, dport: int, payload: bytes) -> object:
-    return Ether() / IP(src=src_ip, dst=dst_ip) / TCP(sport=sport, dport=dport, flags="PA") / payload
+def _pkt(src_ip: str, dst_ip: str, sport: int, dport: int, payload: bytes) -> bytes:
+    return ether(ip_tcp(src_ip, dst_ip, sport, dport, payload))
 
 
 def _hybrid_tls_bytes() -> tuple[bytes, bytes]:
@@ -68,13 +65,13 @@ def test_end_to_end_pcap_to_json(tmp_path: Path) -> None:
         _pkt("10.0.0.2", "203.0.113.11", 40001, 443, ch_cls),
         _pkt("203.0.113.11", "10.0.0.2", 443, 40001, sh_cls),
     ]
-    # Scapy's TCP checksum caps payload at 65535B per packet, so bulk up the
+    # IPv4 total length caps payload below 65535B per packet, so bulk up the
     # classical flow across many packets (~3 MB total → E ≈ 0.65, score > 5).
     filler = b"\x17\x03\x03" + (50_000).to_bytes(2, "big") + b"\x00" * 50_000
     for _ in range(60):
         pkts.append(_pkt("203.0.113.11", "10.0.0.2", 443, 40001, filler))
     pcap_path = tmp_path / "synth.pcap"
-    wrpcap(str(pcap_path), pkts)
+    write_pcap(pcap_path, pkts)
 
     agg = FlowAggregator()
     for p in read_pcap(pcap_path):

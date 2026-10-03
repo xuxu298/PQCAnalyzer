@@ -1,11 +1,10 @@
-"""Aggregate scapy packets into 5-tuple flows and extract handshake crypto."""
+"""Aggregate decoded packets into 5-tuple flows and extract handshake crypto."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
 from src.flow_analyzer.handshake_parser.ssh_parser import (
     SSHKexInit,
@@ -20,9 +19,7 @@ from src.flow_analyzer.handshake_parser.tls_parser import (
     parse_tls_server_hello,
 )
 from src.flow_analyzer.models import CryptoPrimitive, Flow, Protocol
-
-if TYPE_CHECKING:
-    from scapy.packet import Packet
+from src.flow_analyzer.pcap_reader import Packet
 
 # Cap per-direction buffer. ClientHello is typically < 2 KB; SSH KEXINIT < 4 KB.
 # Keep the cap small so a 10 GB PCAP doesn't blow RAM on long-lived flows.
@@ -214,44 +211,11 @@ def _infer_tls_version(
 def _extract_packet_info(
     pkt: Packet,
 ) -> tuple[str, str, int, int, str, bytes, datetime] | None:
-    """Pull 5-tuple, payload bytes, and timestamp from a scapy packet."""
-    try:
-        from scapy.layers.inet import IP, TCP, UDP
-        from scapy.layers.inet6 import IPv6
-    except ImportError:
+    """Pull 5-tuple, payload bytes, and timestamp from a decoded packet."""
+    if pkt.src is None or pkt.dst is None or pkt.transport is None:
         return None
-
-    if IP in pkt:
-        ip = pkt[IP]
-        src, dst = ip.src, ip.dst
-    elif IPv6 in pkt:
-        ip = pkt[IPv6]
-        src, dst = ip.src, ip.dst
-    else:
-        return None
-
-    if TCP in pkt:
-        layer = pkt[TCP]
-        transport = "tcp"
-    elif UDP in pkt:
-        layer = pkt[UDP]
-        transport = "udp"
-    else:
-        return None
-
-    payload = bytes(layer.payload) if layer.payload else b""
-    ts = _pkt_timestamp(pkt)
-    return (src, dst, int(layer.sport), int(layer.dport), transport, payload, ts)
-
-
-def _pkt_timestamp(pkt: Packet) -> datetime:
-    t = getattr(pkt, "time", None)
-    if t is None:
-        return datetime.now(tz=timezone.utc)
-    try:
-        return datetime.fromtimestamp(float(t), tz=timezone.utc)
-    except (OSError, ValueError, OverflowError):
-        return datetime.now(tz=timezone.utc)
+    ts = pkt.timestamp or datetime.now(tz=timezone.utc)
+    return (pkt.src, pkt.dst, pkt.sport, pkt.dport, pkt.transport, pkt.payload, ts)
 
 
 def aggregate(packets: Iterable[Packet]) -> list[Flow]:

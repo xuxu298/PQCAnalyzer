@@ -68,7 +68,9 @@ benchmark = [
     "psutil>=5.9.0",
 ]
 flow = [
-    "scapy>=2.5.0",
+    # dpkt (BSD-3-Clause) decodes link/IP/TCP headers; capture framing is read
+    # by our own reader so multi-interface pcapng keeps per-interface link types.
+    "dpkt>=1.9.8",
     "PyYAML>=6.0",
 ]
 flow-extras = [

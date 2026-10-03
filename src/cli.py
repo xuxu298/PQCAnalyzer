@@ -388,6 +388,7 @@ def scan_pcap(
         from src.flow_analyzer.flow_aggregator import FlowAggregator
         from src.flow_analyzer.hndl_scorer import score_hndl
         from src.flow_analyzer.pcap_reader import (
+            InvalidFilterError,
             InvalidPCAPError,
             UnsupportedLinkTypeError,
             read_pcap,
@@ -396,7 +397,7 @@ def scan_pcap(
     except ModuleNotFoundError as exc:
         console.print(Panel(
             f"[yellow]Flow analysis dependencies missing.[/yellow]\n\n"
-            f"Install with: [cyan]pip install \"vn-pqc-analyzer[flow]\"[/cyan]\n\n"
+            f"Install with: [cyan]pip install \".[flow]\"[/cyan]\n\n"
             f"Details: {exc}",
             title="[bold]flow_analyzer unavailable[/bold]",
             border_style="yellow",
@@ -420,6 +421,9 @@ def scan_pcap(
                 agg.ingest(pkt)
     except InvalidPCAPError as exc:
         console.print(f"[red]Invalid PCAP: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    except InvalidFilterError as exc:
+        console.print(f"[red]Invalid BPF filter: {exc}[/red]")
         raise typer.Exit(1) from exc
     except UnsupportedLinkTypeError as exc:
         console.print(f"[red]{exc}[/red]")

@@ -38,7 +38,7 @@ class ClassificationRules:
         except ImportError as exc:
             raise ModuleNotFoundError(
                 'PyYAML required for sensitivity rules. Install with: '
-                'pip install "vn-pqc-analyzer[flow]"'
+                'pip install ".[flow]"'
             ) from exc
 
         p = Path(path) if path else DEFAULT_RULES_PATH

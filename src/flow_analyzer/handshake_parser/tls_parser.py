@@ -1,7 +1,7 @@
 """TLS 1.2 / 1.3 ClientHello + ServerHello parser.
 
 Parses raw TCP payload bytes per RFC 5246 (TLS 1.2) and RFC 8446 (TLS 1.3)
-without relying on scapy's TLS layer (which is heavy and optional).
+without relying on a packet library's TLS layer.
 
 Scope:
 - ClientHello: cipher_suites, SNI, supported_groups, signature_algorithms, key_share
