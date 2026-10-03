@@ -150,6 +150,7 @@ class TLSInfo(StrEnum):
     AUTHENTICATION = "TLS Authentication"
     BULK_ENCRYPTION = "Bulk Encryption"
     MAC = "MAC Algorithm"
+    HANDSHAKE_HASH = "Handshake Hash (HKDF)"
     CERTIFICATE = "Certificate"
     CERT_SIGNATURE = "Certificate Signature"
     CERT_PUBLIC_KEY = "Certificate Public Key"

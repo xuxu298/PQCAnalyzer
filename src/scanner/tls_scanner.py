@@ -348,16 +348,19 @@ class TLSScanner:
                     note=algo_info.note_en,
                 ))
 
-        # Check MAC
+        # Check MAC. TLS 1.3 suites are AEAD-only: the hash in the suite name
+        # drives the HKDF key schedule and transcript, it is not a MAC.
         if info.mac_algorithm:
             algo_info = db.classify(info.mac_algorithm)
             if algo_info:
+                tls13 = info.protocol_version == "TLSv1.3"
+                where = "TLSv1.3 key schedule hash" if tls13 else "MAC in cipher suite"
                 findings.append(Finding(
-                    component=TLSInfo.MAC,
+                    component=TLSInfo.HANDSHAKE_HASH if tls13 else TLSInfo.MAC,
                     algorithm=info.mac_algorithm,
                     risk_level=algo_info.risk_level,
                     quantum_vulnerable=algo_info.quantum_vulnerable,
-                    location=f"{target}, MAC in cipher suite",
+                    location=f"{target}, {where}",
                     replacement=algo_info.replacement,
                     migration_priority=algo_info.migration_priority,
                     note=algo_info.note_en,

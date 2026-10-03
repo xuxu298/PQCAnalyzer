@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import functools
 import logging
+import os
 import re
+import ssl
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
 
@@ -21,6 +27,9 @@ from src.scanner.models import (
 from src.utils.constants import RiskLevel, ScanType
 from src.utils.crypto_db import get_algorithm_db
 from src.utils.i18n import t
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +79,120 @@ def _ca_side(finding: Finding, position: str) -> Finding:
     return finding
 
 
+# --- Scoring the authentication half -----------------------------------------
+# A certificate's key and signature authenticate; they are not exposed to
+# harvest-now-decrypt-later (forging one needs a quantum computer at connection
+# time), unlike the key exchange, which the algorithm DB rates CRITICAL. So a
+# Shor-breakable certificate is HIGH — a migration to plan — and a public CA's
+# certificate, which only that CA can replace, is LOW. Keys that are weak even
+# classically keep the DB's CRITICAL.
+_CLASSICALLY_WEAK = {"RSA-1024", "DSA-1024"}
+_NIST_IR_8547 = "NIST IR 8547 deprecates it after 2030 and disallows it after 2035."
+_LEAF_NOTE = (
+    "Authenticates the endpoint; not exposed to harvest-now-decrypt-later, since forging it "
+    "needs a quantum computer at connection time. Replace it with an ML-DSA or hybrid "
+    "certificate once your CA issues them; " + _NIST_IR_8547
+)
+_PRIVATE_CA_NOTE = (
+    "Your own CA: every certificate it issues depends on this key, and CA keys live for years. "
+    "Plan the post-quantum CA hierarchy first; " + _NIST_IR_8547
+)
+_PUBLIC_CA_NOTE = (
+    "Belongs to a publicly trusted CA, which migrates it; nothing for you to change here. "
+    "Track your CA's post-quantum roadmap."
+)
+
+
+def authentication_risk(
+    algo_name: str, risk: RiskLevel, quantum_vulnerable: bool, *, is_ca: bool, public_ca: bool
+) -> tuple[RiskLevel, int, str] | None:
+    """(risk, migration priority, note) for a certificate key or signature, or
+    None to keep the algorithm DB's rating (PQ, classically weak, or not Shor-breakable)."""
+    if not quantum_vulnerable or risk != RiskLevel.CRITICAL or algo_name in _CLASSICALLY_WEAK:
+        return None
+    if is_ca and public_ca:
+        return RiskLevel.LOW, 4, _PUBLIC_CA_NOTE
+    if is_ca:
+        return RiskLevel.HIGH, 1, _PRIVATE_CA_NOTE
+    return RiskLevel.HIGH, 2, _LEAF_NOTE
+
+
+_PEM_CERT = rb"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----"
+
+
+@functools.lru_cache(maxsize=1)
+def _public_trust_store() -> tuple[frozenset[bytes], dict[bytes, tuple[x509.Certificate, ...]]]:
+    """Publicly trusted roots: the Mozilla bundle (certifi) if installed, else the OS store.
+
+    Returns (SHA-256 fingerprints, roots by DER subject). Empty when no store is
+    found — every CA then counts as the customer's own, the conservative side.
+    """
+    paths: list[str] = []
+    try:
+        import certifi  # noqa: PLC0415 — optional; ships with most Python installs
+        paths.append(certifi.where())
+    except ImportError:
+        pass
+    defaults = ssl.get_default_verify_paths()
+    paths += [p for p in (defaults.cafile, defaults.openssl_cafile) if p]
+    for path in paths:
+        if not os.path.isfile(path):
+            continue
+        roots: list[x509.Certificate] = []
+        data = Path(path).read_bytes()
+        pem_blocks = re.findall(_PEM_CERT, data, re.S)
+        for block in pem_blocks:
+            try:
+                with warnings.catch_warnings():
+                    # Some store roots predate RFC 5280 (e.g. a non-positive serial).
+                    warnings.simplefilter("ignore")
+                    roots.append(x509.load_pem_x509_certificate(block))
+            except ValueError:
+                continue  # one odd root must not empty the store
+        if roots:
+            by_subject: dict[bytes, list[x509.Certificate]] = {}
+            for r in roots:
+                by_subject.setdefault(r.subject.public_bytes(), []).append(r)
+            return (frozenset(r.fingerprint(hashes.SHA256()) for r in roots),
+                    {k: tuple(v) for k, v in by_subject.items()})
+    return frozenset(), {}
+
+
+def _issued_by(cert: x509.Certificate, issuer: x509.Certificate) -> bool:
+    """True when ``issuer``'s key verifiably signed ``cert`` — names alone are not trusted."""
+    if cert.issuer != issuer.subject:
+        return False
+    try:
+        cert.verify_directly_issued_by(issuer)
+        return True
+    except Exception:  # noqa: BLE001 — bad signature, unsupported key type, …
+        return False
+
+
+def publicly_trusted(cert: x509.Certificate, anchors: Iterable[x509.Certificate] = ()) -> bool:
+    """Is ``cert`` a public root, or signed by one?
+
+    ``anchors``: chain certs already shown public, for intermediates below them.
+    """
+    fingerprints, by_subject = _public_trust_store()
+    if cert.fingerprint(hashes.SHA256()) in fingerprints:
+        return True
+    candidates = [*by_subject.get(cert.issuer.public_bytes(), ()), *anchors]
+    return any(_issued_by(cert, c) for c in candidates)
+
+
+def _public_flags(certs: list[x509.Certificate]) -> list[bool]:
+    """Per cert: part of a publicly trusted CA hierarchy? Walks top-down so an
+    intermediate signed by an already-public intermediate counts too."""
+    flags = [False] * len(certs)
+    public: list[x509.Certificate] = []
+    for i in range(len(certs) - 1, -1, -1):
+        if publicly_trusted(certs[i], public):
+            flags[i] = True
+            public.append(certs[i])
+    return flags
+
+
 def _key_algorithm_oid(cert: x509.Certificate) -> str:
     try:
         return cert.public_key_algorithm_oid.dotted_string
@@ -100,10 +223,11 @@ class CertAnalyzer:
                 result.error_message = f"No certificates found in {cert_path}"
                 return result
 
+            flags = _public_flags(certs)
             for i, cert in enumerate(certs):
                 position = self._determine_chain_position(i, len(certs))
                 cert_info = self._parse_cert(cert, position)
-                findings = self._assess_cert(cert_info, cert_path)
+                findings = self._assess_cert(cert_info, cert_path, public_ca=flags[i])
                 result.findings.extend(findings)
 
             result.status = ScanStatus.SUCCESS
@@ -129,7 +253,7 @@ class CertAnalyzer:
         """
         cert = x509.load_der_x509_certificate(cert_bytes)
         cert_info = self._parse_cert(cert, "leaf")
-        findings = self._assess_cert(cert_info, source)
+        findings = self._assess_cert(cert_info, source, public_ca=publicly_trusted(cert))
         return cert_info, findings
 
     def analyze_chain_bytes(
@@ -143,25 +267,31 @@ class CertAnalyzer:
         infos: list[CertificateInfo] = []
         findings: list[Finding] = []
         seen: set[bytes] = set()
+        parsed: list[tuple[int, x509.Certificate]] = []
         for i, der in enumerate(chain_der):
             # Servers sometimes send the same cert twice; assess it once.
             if der in seen:
                 continue
             seen.add(der)
             try:
-                cert = x509.load_der_x509_certificate(der)
-                # Position comes from where the server put the cert, not from
-                # how many parsed: element 0 is the leaf even if it fails.
-                if i == 0:
-                    position = "leaf"
-                elif cert.subject == cert.issuer:
-                    position = "root"
-                else:
-                    # Servers rarely send the root, so the last cert is usually
-                    # an intermediate; only a self-signed cert counts as root.
-                    position = "intermediate"
+                parsed.append((i, x509.load_der_x509_certificate(der)))
+            except Exception as exc:  # noqa: BLE001 — one odd cert must not sink the scan
+                logger.warning("Skipping cert %d from %s: %s", i, source, exc)
+        flags = _public_flags([c for _, c in parsed])
+        for (i, cert), public_ca in zip(parsed, flags, strict=True):
+            # Position comes from where the server put the cert, not from
+            # how many parsed: element 0 is the leaf even if it fails.
+            if i == 0:
+                position = "leaf"
+            elif cert.subject == cert.issuer:
+                position = "root"
+            else:
+                # Servers rarely send the root, so the last cert is usually
+                # an intermediate; only a self-signed cert counts as root.
+                position = "intermediate"
+            try:
                 info = self._parse_cert(cert, position)
-                cert_findings = self._assess_cert(info, source)
+                cert_findings = self._assess_cert(info, source, public_ca=public_ca)
             except Exception as exc:  # noqa: BLE001 — one odd cert must not sink the scan
                 logger.warning("Skipping cert %d from %s: %s", i, source, exc)
                 continue
@@ -314,9 +444,13 @@ class CertAnalyzer:
         return info
 
     def _assess_cert(
-        self, info: CertificateInfo, source: str
+        self, info: CertificateInfo, source: str, *, public_ca: bool = False
     ) -> list[Finding]:
-        """Assess a certificate for quantum vulnerability."""
+        """Assess a certificate for quantum vulnerability.
+
+        ``public_ca``: the cert belongs to a publicly trusted CA hierarchy
+        (see :func:`publicly_trusted`); only matters when the cert is a CA.
+        """
         findings: list[Finding] = []
         db = get_algorithm_db()
         cn = info.subject.get("commonName", "unknown")
@@ -344,30 +478,38 @@ class CertAnalyzer:
                 ),
             ))
         if algo_info:
+            risk, priority, note = authentication_risk(
+                algo_info.name, algo_info.risk_level, algo_info.quantum_vulnerable,
+                is_ca=info.is_ca, public_ca=public_ca,
+            ) or (algo_info.risk_level, algo_info.migration_priority, algo_info.note_en)
             findings.append(Finding(
                 component=TLSInfo.CERT_PUBLIC_KEY,
                 algorithm=key_label,
-                risk_level=algo_info.risk_level,
+                risk_level=risk,
                 quantum_vulnerable=algo_info.quantum_vulnerable,
                 location=location,
                 replacement=algo_info.replacement,
-                migration_priority=algo_info.migration_priority,
-                note=algo_info.note_en,
+                migration_priority=priority,
+                note=note,
             ))
 
         # Assess signature algorithm
         sig_algo = db.classify(info.signature_algorithm)
         if sig_algo:
             # Signature risk considers the signing key, not hash
+            risk, priority, note = authentication_risk(
+                sig_algo.name, sig_algo.risk_level, sig_algo.quantum_vulnerable,
+                is_ca=info.is_ca, public_ca=public_ca,
+            ) or (sig_algo.risk_level, sig_algo.migration_priority, sig_algo.note_en)
             findings.append(Finding(
                 component=TLSInfo.CERT_SIGNATURE,
                 algorithm=info.signature_algorithm,
-                risk_level=sig_algo.risk_level,
+                risk_level=risk,
                 quantum_vulnerable=sig_algo.quantum_vulnerable,
                 location=location,
                 replacement=sig_algo.replacement,
-                migration_priority=sig_algo.migration_priority,
-                note=sig_algo.note_en,
+                migration_priority=priority,
+                note=note,
             ))
 
         # A SHA-1/MD5 signature is forgeable today (collisions), regardless of

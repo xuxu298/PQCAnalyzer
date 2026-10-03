@@ -73,10 +73,10 @@ The parser recognises the following hybrid / PQC named groups on the wire:
 
 | Codepoint | Name | Kind |
 |---|---|---|
-| `0x11EB` | `X25519MLKEM768` | Hybrid (IANA, post FIPS 203) |
-| `0x11EC` | `X25519Kyber768Draft00` | Hybrid (Cloudflare/Chrome draft) |
-| `0x6399` | `SecP256r1Kyber768Draft00` | Hybrid (Chrome draft) |
-| `0x639A` | `SecP384r1Kyber768Draft00` | Hybrid |
+| `0x11EB` | `SecP256r1MLKEM768` | Hybrid (IANA, post FIPS 203) |
+| `0x11EC` | `X25519MLKEM768` | Hybrid (IANA, post FIPS 203) — what Cloudflare, Google and current browsers send |
+| `0x6399` | `X25519Kyber768Draft00` | Hybrid, pre-standard Kyber draft (obsolete) |
+| `0x639A` | `SecP256r1Kyber768Draft00` | Hybrid, pre-standard Kyber draft (obsolete) |
 
 And these SSH KEX names:
 

@@ -39,7 +39,7 @@ def _check_nist_pqc_readiness(findings: list[Finding]) -> list[ComplianceStatus]
             status="non_compliant",
             details=f"{len(qv_kex)} quantum-vulnerable key exchange(s) found. "
                     "ML-KEM (Kyber) should replace RSA/ECDH/DH key exchange.",
-            remediation="Enable ML-KEM-768 or hybrid X25519Kyber768 key exchange.",
+            remediation="Enable ML-KEM-768 or the hybrid X25519MLKEM768 key exchange.",
         ))
     else:
         statuses.append(ComplianceStatus(

@@ -39,13 +39,13 @@ _RECOMMENDATIONS: list[dict] = [
     {
         "match_component": ["TLS Key Exchange"],
         "match_algorithm": ["ECDHE", "DHE", "RSA key exchange", "X25519", "Curve25519"],
-        "replace_with": "ML-KEM-768 (hybrid X25519Kyber768)",
+        "replace_with": "ML-KEM-768 (hybrid X25519MLKEM768)",
         "effort": "Low-Medium",
         "risk": "Low (hybrid mode backward compatible)",
         "phase": 1,
         "steps": [
             "Verify server supports TLS 1.3",
-            "Enable X25519Kyber768 hybrid key exchange in server config",
+            "Enable the X25519MLKEM768 hybrid key exchange in server config",
             "Test with clients that support hybrid KEM",
             "Monitor handshake latency and success rate",
             "Disable classical-only key exchange after validation",

@@ -1,11 +1,16 @@
 {
-  "version": "1.0.0",
-  "last_updated": "2026-04-12",
+  "version": "1.1.0",
+  "last_updated": "2026-10-03",
   "changelog": [
     {
       "version": "1.0.0",
       "date": "2026-04-12",
       "changes": "Initial release with FIPS 203/204/205 and 35+ classical algorithms"
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-10-03",
+      "changes": "Classical key exchange (ECDHE, X25519, X448, DHE-2048) raised to CRITICAL: it is the part HNDL attacks today. AES-128 lowered to LOW per NIST IR 8547. X25519Kyber768 (withdrawn draft) replaced by X25519MLKEM768 as the recommended hybrid."
     }
   ],
   "algorithms": {
@@ -145,37 +150,37 @@
       "type": "key_exchange",
       "usage": ["key_exchange"],
       "quantum_vulnerable": true,
-      "risk_level": "HIGH",
+      "risk_level": "CRITICAL",
       "attack": "Shor's algorithm",
       "estimated_break": "2030-2040 (CRQC)",
-      "replacement": ["ML-KEM-768", "X25519Kyber768"],
+      "replacement": ["X25519MLKEM768", "SecP256r1MLKEM768"],
       "migration_priority": 1,
-      "note_vi": "Forward secrecy bảo vệ phiên hiện tại nhưng không chống harvest-now-decrypt-later.",
-      "note_en": "Forward secrecy protects current sessions but not against HNDL."
+      "note_vi": "Forward secrecy bảo vệ phiên hiện tại nhưng không chống harvest-now-decrypt-later. Đây là phần duy nhất của TLS/SSH/VPN mà 'thu trước, giải mã sau' tấn công được ngay hôm nay: lưu lượng ghi lại sẽ bị giải mã khi có máy tính lượng tử.",
+      "note_en": "Forward secrecy protects current sessions but not against HNDL. The only part of TLS/SSH/VPN that harvest-now-decrypt-later can attack today: recorded traffic is decrypted once a quantum computer exists."
     },
     "ECDHE-P384": {
       "type": "key_exchange",
       "usage": ["key_exchange"],
       "quantum_vulnerable": true,
-      "risk_level": "HIGH",
+      "risk_level": "CRITICAL",
       "attack": "Shor's algorithm",
       "estimated_break": "2030-2040 (CRQC)",
-      "replacement": ["ML-KEM-1024", "X25519Kyber768"],
+      "replacement": ["SecP384r1MLKEM1024", "X25519MLKEM768"],
       "migration_priority": 1,
-      "note_vi": "ECDHE P-384 vulnerable trước Shor. Chuyển sang hybrid KEM.",
-      "note_en": "ECDHE P-384 vulnerable to Shor. Migrate to hybrid KEM."
+      "note_vi": "ECDHE P-384 bị phá bởi Shor. Chuyển sang KEM lai. Đây là phần duy nhất của TLS/SSH/VPN mà 'thu trước, giải mã sau' tấn công được ngay hôm nay: lưu lượng ghi lại sẽ bị giải mã khi có máy tính lượng tử.",
+      "note_en": "ECDHE P-384 is broken by Shor. Move to a hybrid KEM. The only part of TLS/SSH/VPN that harvest-now-decrypt-later can attack today: recorded traffic is decrypted once a quantum computer exists."
     },
     "DHE-2048": {
       "type": "key_exchange",
       "usage": ["key_exchange"],
       "quantum_vulnerable": true,
-      "risk_level": "HIGH",
+      "risk_level": "CRITICAL",
       "attack": "Shor's algorithm",
       "estimated_break": "2030-2040 (CRQC)",
-      "replacement": ["ML-KEM-768"],
+      "replacement": ["ML-KEM-768", "X25519MLKEM768"],
       "migration_priority": 1,
-      "note_vi": "Diffie-Hellman bị phá bởi Shor. Chuyển sang ML-KEM.",
-      "note_en": "Diffie-Hellman broken by Shor. Migrate to ML-KEM."
+      "note_vi": "Diffie-Hellman bị phá bởi Shor. Chuyển sang ML-KEM. Đây là phần duy nhất của TLS/SSH/VPN mà 'thu trước, giải mã sau' tấn công được ngay hôm nay: lưu lượng ghi lại sẽ bị giải mã khi có máy tính lượng tử.",
+      "note_en": "Diffie-Hellman is broken by Shor. Migrate to ML-KEM. The only part of TLS/SSH/VPN that harvest-now-decrypt-later can attack today: recorded traffic is decrypted once a quantum computer exists."
     },
     "DHE-1024": {
       "type": "key_exchange",
@@ -193,25 +198,25 @@
       "type": "key_exchange",
       "usage": ["key_exchange"],
       "quantum_vulnerable": true,
-      "risk_level": "HIGH",
+      "risk_level": "CRITICAL",
       "attack": "Shor's algorithm (ECDLP variant)",
       "estimated_break": "2030-2040 (CRQC)",
-      "replacement": ["ML-KEM-768", "X25519Kyber768"],
+      "replacement": ["X25519MLKEM768"],
       "migration_priority": 1,
-      "note_vi": "X25519 dựa trên ECDLP, bị phá bởi Shor. Dùng hybrid X25519Kyber768.",
-      "note_en": "X25519 is ECDLP-based, broken by Shor. Use hybrid X25519Kyber768."
+      "note_vi": "X25519 dựa trên ECDLP, bị phá bởi Shor. Dùng hybrid X25519MLKEM768. Đây là phần duy nhất của TLS/SSH/VPN mà 'thu trước, giải mã sau' tấn công được ngay hôm nay: lưu lượng ghi lại sẽ bị giải mã khi có máy tính lượng tử.",
+      "note_en": "X25519 is ECDLP-based, broken by Shor. Use the hybrid X25519MLKEM768. The only part of TLS/SSH/VPN that harvest-now-decrypt-later can attack today: recorded traffic is decrypted once a quantum computer exists."
     },
     "X448": {
       "type": "key_exchange",
       "usage": ["key_exchange"],
       "quantum_vulnerable": true,
-      "risk_level": "HIGH",
+      "risk_level": "CRITICAL",
       "attack": "Shor's algorithm (ECDLP variant)",
       "estimated_break": "2030-2040 (CRQC)",
       "replacement": ["ML-KEM-1024"],
       "migration_priority": 1,
-      "note_vi": "X448 bị phá bởi Shor.",
-      "note_en": "X448 broken by Shor."
+      "note_vi": "X448 bị phá bởi Shor. Đây là phần duy nhất của TLS/SSH/VPN mà 'thu trước, giải mã sau' tấn công được ngay hôm nay: lưu lượng ghi lại sẽ bị giải mã khi có máy tính lượng tử.",
+      "note_en": "X448 is broken by Shor. The only part of TLS/SSH/VPN that harvest-now-decrypt-later can attack today: recorded traffic is decrypted once a quantum computer exists."
     },
     "AES-256": {
       "type": "symmetric",
@@ -241,13 +246,13 @@
       "type": "symmetric",
       "usage": ["encryption"],
       "quantum_vulnerable": false,
-      "risk_level": "MEDIUM",
-      "attack": "Grover's algorithm reduces to 64-bit security",
-      "estimated_break": "Potentially insufficient post-quantum",
+      "risk_level": "LOW",
+      "attack": "Grover's algorithm (quadratic speed-up that does not parallelise well)",
+      "estimated_break": "Not expected — NIST IR 8547 keeps AES-128 approved",
       "replacement": ["AES-256"],
-      "migration_priority": 3,
-      "note_vi": "AES-128 giảm xuống 64-bit — nên nâng lên AES-256.",
-      "note_en": "AES-128 reduced to 64-bit — should upgrade to AES-256."
+      "migration_priority": 4,
+      "note_vi": "AES-128 vẫn được phép dùng sau chuyển đổi lượng tử (NIST IR 8547): Grover không khả thi ở cỡ khoá này. Ưu tiên AES-256 cho dữ liệu cần giữ bí mật hàng chục năm hoặc theo CNSA 2.0.",
+      "note_en": "AES-128 stays approved after the quantum transition (NIST IR 8547): Grover's speed-up is impractical at this key size. Prefer AES-256 for data that must stay secret for decades or under CNSA 2.0."
     },
     "3DES": {
       "type": "symmetric",

@@ -36,7 +36,7 @@ Scan your infrastructure for quantum-vulnerable cryptography. Get a migration ro
 
 ![Scan output](docs/scan_screenshot.png)
 
-Cloudflare and Google now serve hybrid `X25519MLKEM768` (IANA 0x11EC) by default — the scanner detects this via an active TLS 1.3 ClientHello probe and marks those endpoints SAFE. GitHub still negotiates classical `ECDHE`, so it gets flagged `HIGH` with the NIST FIPS 203 replacement (`ML-KEM-768`) called out. The scan surfaces what's actually on the wire, not what a server *could* support.
+Cloudflare and Google now serve hybrid `X25519MLKEM768` (IANA 0x11EC) by default — the scanner detects this via an active TLS 1.3 ClientHello probe and marks those endpoints SAFE. GitHub still negotiates classical `ECDHE`, so it gets flagged `CRITICAL` (harvest-now-decrypt-later exposure) with the NIST FIPS 203 replacement (`ML-KEM-768`) called out. The scan surfaces what's actually on the wire, not what a server *could* support.
 
 ### Flow Analysis (HNDL Radar) in action
 
@@ -251,11 +251,11 @@ All scan results and roadmaps export as structured JSON via CLI (`-o output.json
 
 | Level | Description | Action |
 |-------|-------------|--------|
-| CRITICAL | Quantum-vulnerable + internet-facing | Migrate immediately |
-| HIGH | Quantum-vulnerable or broken classical | Migrate in 3-6 months |
+| CRITICAL | Classical key exchange — exposed to harvest-now-decrypt-later today — or broken even classically (RSA-1024, RC4, MD5…) | Migrate first |
+| HIGH | Quantum-vulnerable authentication you own: certificate keys and signatures (forging needs a quantum computer at connection time) | Plan before 2030 (NIST IR 8547) |
 | MEDIUM | Weak but not broken | Upgrade when convenient |
-| LOW | Acceptable but not optimal | Monitor |
-| SAFE | Post-quantum safe or AES-256 | No action needed |
+| LOW | Acceptable (e.g. AES-128), or a public CA's certificate that the CA migrates | Monitor |
+| SAFE | Post-quantum safe (ML-KEM, ML-DSA, hybrid key exchange) or AES-256 | No action needed |
 
 ## Testing
 

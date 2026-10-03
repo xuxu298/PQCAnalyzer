@@ -17,7 +17,7 @@ class TestAlgorithmDatabase:
         assert len(all_algos) >= 30
 
     def test_version(self, db):
-        assert db.version == "1.0.0"
+        assert db.version == "1.1.0"
 
     def test_lookup_exact(self, db):
         info = db.lookup("RSA-2048")
@@ -63,7 +63,7 @@ class TestAlgorithmDatabase:
 
         info2 = db.classify("AES-128")
         assert info2 is not None
-        assert info2.risk_level == RiskLevel.MEDIUM
+        assert info2.risk_level == RiskLevel.LOW
 
     def test_classify_sha_variants(self, db):
         info = db.classify("SHA-256")
