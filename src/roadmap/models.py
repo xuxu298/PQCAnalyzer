@@ -167,6 +167,10 @@ class MigrationRoadmap:
     total_findings: int = 0
     critical_findings: int = 0
     quantum_vulnerable_count: int = 0
+    # See src/roadmap/posture.py: classical key exchange in scope (HNDL today),
+    # and a HIGH that only public-CA leaf certificates cause (nothing to do yet).
+    hndl_exposed: bool = True
+    planning_only: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -175,6 +179,8 @@ class MigrationRoadmap:
             "organization": self.organization,
             "scope_summary": self.scope_summary,
             "overall_risk": self.overall_risk.value,
+            "hndl_exposed": self.hndl_exposed,
+            "planning_only": self.planning_only,
             "total_findings": self.total_findings,
             "critical_findings": self.critical_findings,
             "quantum_vulnerable_count": self.quantum_vulnerable_count,

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.x509.oid import ExtensionOID, NameOID
 
 from src.scanner.models import (
@@ -93,6 +94,11 @@ _LEAF_NOTE = (
     "needs a quantum computer at connection time. Replace it with an ML-DSA or hybrid "
     "certificate once your CA issues them; " + _NIST_IR_8547
 )
+_PUBLIC_LEAF_NOTE = (
+    "Issued by a public CA. No public CA issues post-quantum web certificates yet, so there "
+    "is nothing to change today: a planning item. Replace it with an ML-DSA or hybrid "
+    "certificate once your CA offers one; " + _NIST_IR_8547
+)
 _PRIVATE_CA_NOTE = (
     "Your own CA: every certificate it issues depends on this key, and CA keys live for years. "
     "Plan the post-quantum CA hierarchy first; " + _NIST_IR_8547
@@ -114,7 +120,7 @@ def authentication_risk(
         return RiskLevel.LOW, 4, _PUBLIC_CA_NOTE
     if is_ca:
         return RiskLevel.HIGH, 1, _PRIVATE_CA_NOTE
-    return RiskLevel.HIGH, 2, _LEAF_NOTE
+    return RiskLevel.HIGH, 2, _PUBLIC_LEAF_NOTE if public_ca else _LEAF_NOTE
 
 
 _PEM_CERT = rb"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----"
@@ -169,13 +175,27 @@ def _issued_by(cert: x509.Certificate, issuer: x509.Certificate) -> bool:
         return False
 
 
+def _spki(cert: x509.Certificate) -> bytes | None:
+    try:
+        return cert.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+    except Exception:  # noqa: BLE001 — key type cryptography can't load
+        return None
+
+
 def publicly_trusted(cert: x509.Certificate, anchors: Iterable[x509.Certificate] = ()) -> bool:
-    """Is ``cert`` a public root, or signed by one?
+    """Is ``cert`` a public root, a cross-signed copy of one, or signed by one?
 
     ``anchors``: chain certs already shown public, for intermediates below them.
+    A cross-sign carries a store root's own name and key but is signed by an
+    older root, which may have left the store (GTS Root R4 by GlobalSign Root
+    CA): the key is still the public CA's, so is the migration.
     """
     fingerprints, by_subject = _public_trust_store()
     if cert.fingerprint(hashes.SHA256()) in fingerprints:
+        return True
+    same_name = by_subject.get(cert.subject.public_bytes(), ())
+    key = _spki(cert) if same_name else None
+    if key is not None and any(_spki(r) == key for r in same_name):
         return True
     candidates = [*by_subject.get(cert.issuer.public_bytes(), ()), *anchors]
     return any(_issued_by(cert, c) for c in candidates)

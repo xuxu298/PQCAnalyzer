@@ -168,3 +168,43 @@ def test_suite_hash_label_depends_on_protocol(protocol, component):
     info = TLSConnectionInfo(protocol_version=protocol, mac_algorithm="SHA-256")
     findings = TLSScanner()._analyze(info, "h:443")
     assert [f.component for f in findings if f.algorithm == "SHA-256"] == [component]
+
+
+def test_public_leaf_note_says_planning_item(monkeypatch, pki):
+    root, inter, leaf = pki
+    _trust(monkeypatch, root)
+    _, findings = CertAnalyzer().analyze_chain_bytes([_der(leaf), _der(inter)], source="app:443")
+    assert all("planning item" in f.note for f in _by_cn(findings)["app.example.com"])
+
+
+def test_private_leaf_note_is_not_planning_item(monkeypatch, pki):
+    _trust(monkeypatch)
+    _, inter, leaf = pki
+    _, findings = CertAnalyzer().analyze_chain_bytes([_der(leaf), _der(inter)], source="app:443")
+    assert not any("planning item" in f.note for f in _by_cn(findings)["app.example.com"])
+
+
+def test_cross_signed_copy_of_a_trusted_root_is_public(monkeypatch):
+    """Cloudflare's chain: GTS Root R4 cross-signed by GlobalSign Root CA, which
+    left the trust store. The key is GTS Root R4's own, so it is a public CA."""
+    old_key, r4_key, we1_key, leaf_key = (ec.generate_private_key(ec.SECP384R1()) for _ in range(4))
+    r4_self = _cert("GTS Root R4", r4_key, r4_key, "GTS Root R4", ca=True)
+    r4_cross = _cert("GTS Root R4", r4_key, old_key, "GlobalSign Root CA", ca=True)
+    we1 = _cert("WE1", we1_key, r4_key, "GTS Root R4", ca=True)
+    leaf = _cert("cloudflare.example", leaf_key, we1_key, "WE1", ca=False)
+    _trust(monkeypatch, r4_self)  # GlobalSign Root CA is not in the store
+    _, findings = CertAnalyzer().analyze_chain_bytes(
+        [_der(c) for c in (leaf, we1, r4_cross)], source="cf:443")
+    by = _by_cn(findings)
+    assert {f.risk_level for f in by["GTS Root R4"]} == {RiskLevel.LOW}
+    assert {f.risk_level for f in by["WE1"]} == {RiskLevel.LOW}
+
+
+def test_same_name_different_key_is_not_a_cross_sign(monkeypatch, pki):
+    root, _, _ = pki
+    _trust(monkeypatch, root)
+    other = ec.generate_private_key(ec.SECP256R1())
+    fake_root = _cert("Test Root", other, other, "Test Root", ca=True)
+    leaf = _cert("y", other, other, "Test Root", ca=False)
+    _, findings = CertAnalyzer().analyze_chain_bytes([_der(leaf), _der(fake_root)], source="y:443")
+    assert {f.risk_level for f in _by_cn(findings)["Test Root"]} == {RiskLevel.HIGH}

@@ -791,6 +791,7 @@ def generate_roadmap(
     from src.roadmap.cost_estimator import estimate_cost
     from src.roadmap.input_adapter import load_findings
     from src.roadmap.models import MigrationRoadmap
+    from src.roadmap.posture import overall_posture
     from src.roadmap.priority_engine import build_migration_tasks, build_phases
     from src.roadmap.recommendation import recommend_all
     from src.roadmap.risk_scorer import score_findings
@@ -827,17 +828,14 @@ def generate_roadmap(
 
     # Overall risk
     critical_count = sum(1 for f in findings if f.risk_level == RiskLevel.CRITICAL)
-    high_count = sum(1 for f in findings if f.risk_level == RiskLevel.HIGH)
-    if critical_count > 0:
-        overall = RiskLevel.CRITICAL
-    elif high_count > 0:
-        overall = RiskLevel.HIGH
-    else:
-        overall = RiskLevel.MEDIUM
+    posture = overall_posture(findings)
+    overall = posture.risk
 
     roadmap = MigrationRoadmap(
         organization=organization,
         overall_risk=overall,
+        hndl_exposed=posture.hndl_exposed,
+        planning_only=posture.planning_only,
         phases=phases,
         risk_scores=risk_scores,
         cost_estimate=cost,

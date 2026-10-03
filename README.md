@@ -332,7 +332,7 @@ pqc-analyzer benchmark kem --iterations 1000
 
 Gặp lỗi hoặc có câu hỏi? Mở một issue: https://github.com/xuxu298/PQCAnalyzer/issues
 
-Bản này được duy trì để sửa lỗi; tính năng mới nằm ở **VPQ Audit**. Liên hệ **dongnx@dataq.vn**.
+Bản này được duy trì để sửa lỗi; tính năng mới nằm ở **[VPQ Audit](https://vpqaudit.atkvn.com)**. Liên hệ **dongnx@atkvn.com**.
 
 ---
 
