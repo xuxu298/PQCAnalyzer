@@ -19,7 +19,22 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from scapy.all import Ether, IP, TCP, Raw, wrpcap
+import socket
+
+import dpkt
+
+_PA = dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK
+_A = dpkt.tcp.TH_ACK
+
+
+def _pkt(src: str, dst: str, sport: int, dport: int, flags: int, seq: int, load: bytes) -> bytes:
+    tcp = dpkt.tcp.TCP(sport=sport, dport=dport, flags=flags, seq=seq, data=load)
+    ip = dpkt.ip.IP(src=socket.inet_aton(src), dst=socket.inet_aton(dst), p=dpkt.ip.IP_PROTO_TCP, ttl=64, data=tcp)
+    eth = dpkt.ethernet.Ethernet(
+        dst=b"\x02\x00\x00\x00\x00\x02", src=b"\x02\x00\x00\x00\x00\x01",
+        type=dpkt.ethernet.ETH_TYPE_IP, data=ip,
+    )
+    return bytes(eth)
 
 
 def _tls_record(msg_type: int, payload: bytes, version: bytes = b"\x03\x03") -> bytes:
@@ -124,8 +139,8 @@ def _ssh_pair() -> tuple[bytes, bytes]:
 
 def _flow(src, dst, sport, dport, c_bytes, s_bytes, seq=1000, pad_to=0):
     pkts = [
-        Ether() / IP(src=src, dst=dst) / TCP(sport=sport, dport=dport, flags="PA", seq=seq) / Raw(load=c_bytes),
-        Ether() / IP(src=dst, dst=src) / TCP(sport=dport, dport=sport, flags="PA", seq=seq + 5000) / Raw(load=s_bytes),
+        _pkt(src, dst, sport, dport, _PA, seq, c_bytes),
+        _pkt(dst, src, dport, sport, _PA, seq + 5000, s_bytes),
     ]
     if pad_to:
         chunk = 1200
@@ -134,9 +149,9 @@ def _flow(src, dst, sport, dport, c_bytes, s_bytes, seq=1000, pad_to=0):
         remaining = pad_to
         while remaining > 0:
             n = min(chunk, remaining)
-            pkts.append(Ether() / IP(src=src, dst=dst) / TCP(sport=sport, dport=dport, flags="A", seq=off_c) / Raw(load=b"\x00" * n))
+            pkts.append(_pkt(src, dst, sport, dport, _A, off_c, b"\x00" * n))
             off_c += n
-            pkts.append(Ether() / IP(src=dst, dst=src) / TCP(sport=dport, dport=sport, flags="A", seq=off_s) / Raw(load=b"\x00" * n))
+            pkts.append(_pkt(dst, src, dport, sport, _A, off_s, b"\x00" * n))
             off_s += n
             remaining -= n
     return pkts
@@ -167,7 +182,10 @@ def main() -> None:
     sh = _server_hello(0x001D, 32)
     pkts += _flow("10.0.0.10", "198.51.100.30", 40004, 443, ch, sh, seq=4000, pad_to=2_200_000)
 
-    wrpcap(str(out), pkts)
+    with out.open("wb") as fh:
+        writer = dpkt.pcap.Writer(fh)
+        for i, frame in enumerate(pkts):
+            writer.writepkt(frame, ts=1_700_000_000 + i * 0.001)
     print(f"Wrote {len(pkts)} packets to {out}")
 
 

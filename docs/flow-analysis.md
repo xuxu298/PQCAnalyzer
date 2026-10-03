@@ -11,7 +11,7 @@ scanner (which asks "*is this server PQ-ready?*"), the flow analyser answers
 pip install "vn-pqc-analyzer[flow]"
 ```
 
-This pulls in `scapy` and `PyYAML`. No libpcap or root required for reading
+This pulls in `dpkt` (BSD-3) and `PyYAML`. No libpcap or root required for reading
 PCAP files; live capture (future) will need libpcap.
 
 ## Quick start
@@ -39,7 +39,7 @@ pqc-analyzer roadmap report.json
 PCAP / pcapng
     │
     ▼
-pcap_reader       ── scapy streaming, handles truncated captures
+pcap_reader       ── streaming pcap/pcapng reader (dpkt headers), handles truncated captures
     │
     ▼
 flow_aggregator   ── 5-tuple grouping, bidirectional merge, payload buffering
