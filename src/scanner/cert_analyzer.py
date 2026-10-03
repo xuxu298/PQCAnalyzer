@@ -88,7 +88,11 @@ def _ca_side(finding: Finding, position: str) -> Finding:
 # certificate, which only that CA can replace, is LOW. Keys that are weak even
 # classically keep the DB's CRITICAL.
 _CLASSICALLY_WEAK = {"RSA-1024", "DSA-1024"}
-_NIST_IR_8547 = "NIST IR 8547 deprecates it after 2030 and disallows it after 2035."
+# NIST IR 8547 (initial public draft, Nov 2024), Tables 2 and 4: 112-bit
+# quantum-vulnerable algorithms (RSA-2048, P-224) deprecated after 2030; every
+# quantum-vulnerable algorithm, whatever its strength, disallowed after 2035.
+_NIST_IR_8547 = ("NIST IR 8547 (draft) disallows it after 2035, and 112-bit keys such as "
+                 "RSA-2048 already after 2030.")
 _LEAF_NOTE = (
     "Authenticates the endpoint; not exposed to harvest-now-decrypt-later, since forging it "
     "needs a quantum computer at connection time. Replace it with an ML-DSA or hybrid "

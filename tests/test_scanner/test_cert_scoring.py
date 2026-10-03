@@ -208,3 +208,14 @@ def test_same_name_different_key_is_not_a_cross_sign(monkeypatch, pki):
     leaf = _cert("y", other, other, "Test Root", ca=False)
     _, findings = CertAnalyzer().analyze_chain_bytes([_der(leaf), _der(fake_root)], source="y:443")
     assert {f.risk_level for f in _by_cn(findings)["Test Root"]} == {RiskLevel.HIGH}
+
+
+def test_certificate_notes_do_not_claim_2030_for_every_key(monkeypatch, pki):
+    """NIST IR 8547 ipd: only 112-bit keys are deprecated after 2030; ECDSA P-256 is 2035."""
+    _trust(monkeypatch)
+    _, inter, leaf = pki
+    _, findings = CertAnalyzer().analyze_chain_bytes([_der(leaf), _der(inter)], source="app:443")
+    for f in findings:
+        assert "deprecates it after 2030" not in f.note
+        if f.risk_level == RiskLevel.HIGH:
+            assert "after 2035" in f.note and "RSA-2048" in f.note

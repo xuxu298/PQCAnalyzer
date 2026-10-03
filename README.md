@@ -252,7 +252,7 @@ All scan results and roadmaps export as structured JSON via CLI (`-o output.json
 | Level | Description | Action |
 |-------|-------------|--------|
 | CRITICAL | Classical key exchange — exposed to harvest-now-decrypt-later today — or broken even classically (RSA-1024, RC4, MD5…) | Migrate first |
-| HIGH | Quantum-vulnerable authentication you own: certificate keys and signatures (forging needs a quantum computer at connection time) | Plan before 2030 (NIST IR 8547) |
+| HIGH | Quantum-vulnerable authentication you own: certificate keys and signatures (forging needs a quantum computer at connection time) | Plan by 2030–2035 (NIST IR 8547 draft: 2030 for 112-bit keys such as RSA-2048, 2035 for all) |
 | MEDIUM | Weak but not broken | Upgrade when convenient |
 | LOW | Acceptable (e.g. AES-128), or a public CA's certificate that the CA migrates | Monitor |
 | SAFE | Post-quantum safe (ML-KEM, ML-DSA, hybrid key exchange) or AES-256 | No action needed |
