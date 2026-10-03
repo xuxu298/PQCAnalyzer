@@ -128,6 +128,12 @@ def authentication_risk(
 
 
 _PEM_CERT = rb"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----"
+_OS_BUNDLES = (
+    "/etc/ssl/certs/ca-certificates.crt",  # Debian, Ubuntu, Alpine (ca-certificates)
+    "/etc/pki/tls/certs/ca-bundle.crt",    # RHEL, Fedora, Rocky
+    "/etc/ssl/ca-bundle.pem",              # SUSE
+    "/etc/ssl/cert.pem",                   # Alpine, macOS
+)
 
 
 @functools.lru_cache(maxsize=1)
@@ -145,6 +151,9 @@ def _public_trust_store() -> tuple[frozenset[bytes], dict[bytes, tuple[x509.Cert
         pass
     defaults = ssl.get_default_verify_paths()
     paths += [p for p in (defaults.cafile, defaults.openssl_cafile) if p]
+    # OpenSSL's compiled-in default (e.g. /usr/lib/ssl/cert.pem on Ubuntu) often
+    # does not exist; the distribution bundle lives elsewhere.
+    paths += list(_OS_BUNDLES)
     for path in paths:
         if not os.path.isfile(path):
             continue

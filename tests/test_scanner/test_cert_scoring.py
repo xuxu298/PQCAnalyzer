@@ -219,3 +219,24 @@ def test_certificate_notes_do_not_claim_2030_for_every_key(monkeypatch, pki):
         assert "deprecates it after 2030" not in f.note
         if f.risk_level == RiskLevel.HIGH:
             assert "after 2035" in f.note and "RSA-2048" in f.note
+
+
+def test_trust_store_falls_back_to_the_os_bundle(monkeypatch):
+    """Without certifi, OpenSSL's compiled-in default (/usr/lib/ssl/cert.pem on
+    Ubuntu) may not exist; the distribution bundle must still be found, or every
+    public CA would be scored as the customer's own."""
+    import os
+    import ssl
+    import sys
+
+    bundle = next((p for p in ca_mod._OS_BUNDLES if os.path.isfile(p)), None)
+    if bundle is None:
+        pytest.skip("no OS CA bundle on this machine")
+    monkeypatch.setitem(sys.modules, "certifi", None)  # import certifi -> ImportError
+    monkeypatch.setattr(ssl, "get_default_verify_paths", lambda: ssl.DefaultVerifyPaths(
+        None, None, "/nonexistent/cert.pem", "", "/nonexistent/certs", ""))
+    ca_mod._public_trust_store.cache_clear()
+    try:
+        assert len(ca_mod._public_trust_store()[0]) > 50
+    finally:
+        ca_mod._public_trust_store.cache_clear()
