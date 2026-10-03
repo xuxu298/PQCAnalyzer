@@ -112,3 +112,29 @@ def test_client_hello_after_empty_ack_is_still_parsed() -> None:
     (flow,) = aggregate(pkts)
     assert flow.crypto is not None
     assert flow.crypto.kex_algorithm == "X25519MLKEM768"
+
+
+def test_flow_cap_counts_instead_of_tracking() -> None:
+    agg = FlowAggregator(max_flows=2)
+    for sport in (40001, 40002, 40003, 40004):
+        agg.ingest(_tcp_payload("10.0.0.1", "10.0.0.2", sport, 443, b"x"))
+    assert len(list(agg.flush())) == 2
+    assert agg.dropped_flows == 2
+
+
+def test_full_buffer_is_not_reparsed(monkeypatch) -> None:
+    """A never-parsing 443 flow used to re-copy and re-parse 16 KB per packet."""
+    from src.flow_analyzer import flow_aggregator as fa
+
+    calls = {"n": 0}
+
+    def counting_parse(data):
+        calls["n"] += 1
+        return None
+
+    monkeypatch.setattr(fa, "parse_tls_client_hello", counting_parse)
+    agg = FlowAggregator()
+    junk = b"\x00" * 1400
+    for _ in range(200):  # ~280 KB, far past the 16 KB buffer
+        agg.ingest(_tcp_payload("10.0.0.1", "10.0.0.2", 40000, 443, junk))
+    assert calls["n"] <= fa.MAX_PAYLOAD_BUFFER // len(junk) + 1

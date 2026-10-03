@@ -88,6 +88,10 @@ class AlgorithmDatabase:
         # is the RSA signing key, not the hash — don't fall through to SHA-*.
         if re.search(r"^RSA(-PSS)?-SHA|WITHRSA", name):
             return self.lookup("RSA-2048")
+        # DSA signatures ("dsa-with-sha256", "id-dsa-with-sha256", "DSA-SHA256"):
+        # rate by the DSA key, as for RSA above. (ECDSA is handled below.)
+        if re.search(r"(^|-)DSA-(WITH-)?SHA|WITHDSA", name) and "ECDSA" not in name:
+            return self.lookup("DSA-2048")
         if "RSA" in name and not any(c.isdigit() for c in name):
             return self.lookup("RSA-2048")  # Default RSA assumption
 

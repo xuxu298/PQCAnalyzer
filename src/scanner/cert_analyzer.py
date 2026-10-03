@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,6 +24,22 @@ from src.utils.i18n import t
 
 logger = logging.getLogger(__name__)
 
+# FIPS 204 / FIPS 205 OID dotted strings — included so the analyser can flag
+# PQ certs as "supported" rather than "unknown" once we encounter them. The
+# `cryptography` library does not yet expose these as named curves, so we map
+# directly from dotted-string OID.
+_PQ_SIGNATURE_OIDS: dict[str, str] = {
+    "2.16.840.1.101.3.4.3.17": "ML-DSA-44",
+    "2.16.840.1.101.3.4.3.18": "ML-DSA-65",
+    "2.16.840.1.101.3.4.3.19": "ML-DSA-87",
+    "2.16.840.1.101.3.4.3.20": "SLH-DSA-SHA2-128s",
+    "2.16.840.1.101.3.4.3.21": "SLH-DSA-SHA2-128f",
+    "2.16.840.1.101.3.4.3.22": "SLH-DSA-SHA2-192s",
+    "2.16.840.1.101.3.4.3.23": "SLH-DSA-SHA2-192f",
+    "2.16.840.1.101.3.4.3.24": "SLH-DSA-SHA2-256s",
+    "2.16.840.1.101.3.4.3.25": "SLH-DSA-SHA2-256f",
+}
+
 # Map cryptography lib signature algorithm OIDs to readable names
 _SIGNATURE_ALGORITHM_NAMES: dict[str, str] = {
     "sha256WithRSAEncryption": "RSA-SHA256",
@@ -36,6 +53,28 @@ _SIGNATURE_ALGORITHM_NAMES: dict[str, str] = {
     "ed25519": "Ed25519",
     "ed448": "Ed448",
 }
+
+
+def _ca_side(finding: Finding, position: str) -> Finding:
+    """Findings on CA certs the server merely relays.
+
+    The customer can't renew or re-key a public CA's intermediate; an expired
+    cross-sign in a served chain is usually harmless (clients build another
+    path). Keep the quantum findings — they show which CAs to move to — but
+    don't let an expired CA cert outrank the customer's own leaf.
+    """
+    if finding.algorithm == "Expired" and finding.risk_level == RiskLevel.CRITICAL:
+        finding.risk_level = RiskLevel.MEDIUM
+        suffix = f"({position} certificate sent by the server)"
+        finding.note = f"{finding.note} {suffix}" if finding.note else suffix
+    return finding
+
+
+def _key_algorithm_oid(cert: x509.Certificate) -> str:
+    try:
+        return cert.public_key_algorithm_oid.dotted_string
+    except Exception:  # noqa: BLE001 — best effort label for an unloadable key
+        return ""
 
 
 class CertAnalyzer:
@@ -103,23 +142,38 @@ class CertAnalyzer:
         """
         infos: list[CertificateInfo] = []
         findings: list[Finding] = []
+        seen: set[bytes] = set()
         for i, der in enumerate(chain_der):
+            # Servers sometimes send the same cert twice; assess it once.
+            if der in seen:
+                continue
+            seen.add(der)
             try:
                 cert = x509.load_der_x509_certificate(der)
-            except ValueError as exc:
-                logger.warning("Skipping unparseable cert %d from %s: %s", i, source, exc)
+                # Position comes from where the server put the cert, not from
+                # how many parsed: element 0 is the leaf even if it fails.
+                if i == 0:
+                    position = "leaf"
+                elif cert.subject == cert.issuer:
+                    position = "root"
+                else:
+                    # Servers rarely send the root, so the last cert is usually
+                    # an intermediate; only a self-signed cert counts as root.
+                    position = "intermediate"
+                info = self._parse_cert(cert, position)
+                cert_findings = self._assess_cert(info, source)
+            except Exception as exc:  # noqa: BLE001 — one odd cert must not sink the scan
+                logger.warning("Skipping cert %d from %s: %s", i, source, exc)
                 continue
-            # Servers rarely send the root, so the last cert is usually an
-            # intermediate; only a self-signed cert counts as root here.
-            if i == 0:
-                position = "leaf"
-            elif cert.subject == cert.issuer:
-                position = "root"
-            else:
-                position = "intermediate"
-            info = self._parse_cert(cert, position)
+            if position != "leaf":
+                # A root's self-signature is never verified by clients; its
+                # key is what matters.
+                cert_findings = [
+                    _ca_side(f, position) for f in cert_findings
+                    if not (position == "root" and f.component == TLSInfo.CERT_SIGNATURE)
+                ]
             infos.append(info)
-            findings.extend(self._assess_cert(info, source))
+            findings.extend(cert_findings)
         return infos, findings
 
     def _load_certs(self, data: bytes) -> list[x509.Certificate]:
@@ -171,9 +225,21 @@ class CertAnalyzer:
         # Self-signed check
         info.is_self_signed = cert.subject == cert.issuer
 
-        # Public key
-        pub_key = cert.public_key()
-        if isinstance(pub_key, rsa.RSAPublicKey):
+        # Public key. `cryptography` raises on key types it can't load (ML-DSA,
+        # SLH-DSA, SM2, GOST…) — exactly the PQ/hybrid certs this tool must
+        # report, so fall back to naming the key by its algorithm OID.
+        try:
+            pub_key = cert.public_key()
+        except (ValueError, TypeError) as exc:
+            oid = _key_algorithm_oid(cert)
+            info.public_key_algorithm = _PQ_SIGNATURE_OIDS.get(
+                oid, f"Unknown key type ({oid or exc})"
+            )
+            info.public_key_size = 0
+            pub_key = None
+        if pub_key is None:
+            pass
+        elif isinstance(pub_key, rsa.RSAPublicKey):
             info.public_key_algorithm = "RSA"
             info.public_key_size = pub_key.key_size
         elif isinstance(pub_key, ec.EllipticCurvePublicKey):
@@ -259,10 +325,28 @@ class CertAnalyzer:
         # Assess public key algorithm
         pub_key_name = self._normalize_pubkey_name(info)
         algo_info = db.classify(pub_key_name)
+        key_label = (
+            f"{info.public_key_algorithm}-{info.public_key_size}"
+            if info.public_key_size else info.public_key_algorithm
+        )
+        if algo_info is None and info.public_key_algorithm.startswith("Unknown key type"):
+            findings.append(Finding(
+                component=TLSInfo.CERT_PUBLIC_KEY,
+                algorithm=key_label,
+                risk_level=RiskLevel.MEDIUM,
+                quantum_vulnerable=False,
+                location=location,
+                replacement=[],
+                migration_priority=3,
+                note=(
+                    "Key algorithm not recognised by this version; "
+                    "review its post-quantum status manually."
+                ),
+            ))
         if algo_info:
             findings.append(Finding(
                 component=TLSInfo.CERT_PUBLIC_KEY,
-                algorithm=f"{info.public_key_algorithm}-{info.public_key_size}",
+                algorithm=key_label,
                 risk_level=algo_info.risk_level,
                 quantum_vulnerable=algo_info.quantum_vulnerable,
                 location=location,
@@ -284,6 +368,30 @@ class CertAnalyzer:
                 replacement=sig_algo.replacement,
                 migration_priority=sig_algo.migration_priority,
                 note=sig_algo.note_en,
+            ))
+
+        # A SHA-1/MD5 signature is forgeable today (collisions), regardless of
+        # the signing key — classify() rates the signature by its key, so say
+        # it separately.
+        sig_upper = info.signature_algorithm.upper().replace("_", "-")
+        weak_hash = None
+        if "MD5" in sig_upper:
+            weak_hash = "MD5"
+        elif re.search(r"SHA-?1(?!\d)", sig_upper):
+            weak_hash = "SHA-1"
+        if weak_hash:
+            findings.append(Finding(
+                component=TLSInfo.CERT_SIGNATURE,
+                algorithm=f"{weak_hash} signature hash",
+                risk_level=RiskLevel.HIGH,
+                quantum_vulnerable=False,
+                location=location,
+                replacement=["SHA-256", "SHA-384"],
+                migration_priority=1,
+                note=(
+                    f"Certificate signed with {info.signature_algorithm}: "
+                    f"{weak_hash} collisions make the signature forgeable."
+                ),
             ))
 
         # Certificate expiry

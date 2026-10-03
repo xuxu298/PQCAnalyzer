@@ -430,6 +430,11 @@ def scan_pcap(
         raise typer.Exit(1) from exc
 
     flows = list(agg.flush())
+    if agg.dropped_flows:
+        console.print(
+            f"[yellow]Flow limit reached: {agg.dropped_flows} further flows "
+            "were not analysed.[/yellow]"
+        )
     if not flows:
         console.print("[yellow]No IPv4/IPv6 TCP/UDP flows observed in capture.[/yellow]")
         raise typer.Exit(0)

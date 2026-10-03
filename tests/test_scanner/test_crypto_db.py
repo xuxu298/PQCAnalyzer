@@ -39,6 +39,11 @@ class TestAlgorithmDatabase:
             info = db.classify(sig)
             assert info is not None and info.name.startswith("RSA"), sig
             assert info.quantum_vulnerable, sig
+        # DSA signatures had the same fall-through to the hash (SHA-256 SAFE).
+        for sig in ("dsa-with-sha256", "id-dsa-with-sha256", "DSA-SHA256"):
+            info = db.classify(sig)
+            assert info is not None and info.name.startswith("DSA"), sig
+        assert db.classify("ecdsa-with-SHA256").name.startswith("ECDSA")
         info = db.classify("RSA")
         assert info is not None
         assert "RSA" in info.name

@@ -199,7 +199,7 @@ def test_pre_standard_kyber_codepoints_match_iana() -> None:
 
 def test_every_hybrid_label_is_reachable_from_a_codepoint() -> None:
     # A hybrid label no codepoint maps to means the table drifted.
-    assert HYBRID_PQC_GROUPS <= set(NAMED_GROUPS.values())
+    assert HYBRID_PQC_GROUPS.issubset(NAMED_GROUPS.values())
 
 
 def test_parse_handles_fragmented_records() -> None:

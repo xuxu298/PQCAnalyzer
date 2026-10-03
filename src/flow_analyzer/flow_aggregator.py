@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from src.flow_analyzer.handshake_parser.ssh_parser import (
     SSHKexInit,
@@ -19,11 +20,19 @@ from src.flow_analyzer.handshake_parser.tls_parser import (
     parse_tls_server_hello,
 )
 from src.flow_analyzer.models import CryptoPrimitive, Flow, Protocol
-from src.flow_analyzer.pcap_reader import Packet
+
+if TYPE_CHECKING:
+    from src.flow_analyzer.pcap_reader import Packet
 
 # Cap per-direction buffer. ClientHello is typically < 2 KB; SSH KEXINIT < 4 KB.
 # Keep the cap small so a 10 GB PCAP doesn't blow RAM on long-lived flows.
 MAX_PAYLOAD_BUFFER = 16 * 1024
+
+# Caps on what one capture can make us hold. A 50 MB upload of minimal
+# packets, each a new 5-tuple, used to build ~1M flows (5.5 GB RSS, a 650 MB
+# report). Past the caps new flows are counted, not tracked.
+MAX_FLOWS = 50_000
+MAX_TOTAL_BUFFER = 256 * 1024 * 1024
 
 WELL_KNOWN_TLS_PORTS = {443, 465, 563, 636, 853, 993, 995, 8443}
 WELL_KNOWN_SSH_PORTS = {22, 2222}
@@ -105,8 +114,14 @@ def _side_is_c2s(
 class FlowAggregator:
     """Stream packets → emit Flow objects with parsed handshake crypto."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, max_flows: int = MAX_FLOWS, max_total_buffer: int = MAX_TOTAL_BUFFER
+    ) -> None:
         self._flows: dict[tuple, _FlowState] = {}
+        self._max_flows = max_flows
+        self._buffer_budget = max_total_buffer
+        #: Flows seen after the flow cap was reached (not analysed).
+        self.dropped_flows = 0
 
     def ingest(self, pkt: Packet) -> None:
         info = _extract_packet_info(pkt)
@@ -121,6 +136,9 @@ class FlowAggregator:
 
         flow = self._flows.get(key)
         if flow is None:
+            if len(self._flows) >= self._max_flows:
+                self.dropped_flows += 1
+                return
             flow = _FlowState(
                 src_ip=a,
                 dst_ip=b,
@@ -142,9 +160,14 @@ class FlowAggregator:
 
         is_c2s = _side_is_c2s(flow, src_ip, src_port)
         target = flow.buf_c2s if is_c2s else flow.buf_s2c
-        if len(target) < MAX_PAYLOAD_BUFFER:
-            remaining = MAX_PAYLOAD_BUFFER - len(target)
-            target.extend(payload[:remaining])
+        room = min(MAX_PAYLOAD_BUFFER - len(target), self._buffer_budget)
+        if room <= 0:
+            # Buffer (or the global budget) is full: nothing new to parse, and
+            # re-parsing the same 16 KB on every packet is pure CPU burn.
+            return
+        chunk = payload[:room]
+        target.extend(chunk)
+        self._buffer_budget -= len(chunk)
 
         # Opportunistic parse — cheap to retry until we get a message, then stop.
         if flow.protocol in (Protocol.TLS_1_2, Protocol.TLS_1_3):

@@ -164,7 +164,13 @@ class TLSScanner:
         if get_chain is not None:
             try:
                 chain = get_chain() or []
-                ders = [c.public_bytes(ssl._ssl.ENCODING_DER) for c in chain]
+                # 3.13's public API returns DER bytes; the 3.10–3.12 private
+                # one returns Certificate objects.
+                ders = [
+                    bytes(c) if isinstance(c, (bytes, bytearray))
+                    else c.public_bytes(ssl._ssl.ENCODING_DER)
+                    for c in chain
+                ]
                 if ders:
                     return ders
             except Exception as exc:
@@ -390,7 +396,7 @@ class TLSScanner:
                 algorithm="Expiring soon",
                 risk_level=RiskLevel.MEDIUM,
                 quantum_vulnerable=False,
-                location=f"{target}, CN={cn}",
+                location=f"{target}, CN={cn}, leaf cert",
                 replacement=["Renew certificate"],
                 migration_priority=2,
                 note=t("cert_expiring_soon", days=days_left),

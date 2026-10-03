@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import socket
 import struct
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import dpkt
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def ip_tcp(
@@ -33,7 +36,8 @@ def ip_tcp(
 def ether(l3: bytes, pad_to: int = 0) -> bytes:
     """Wrap an IP packet in Ethernet II; optionally pad like a NIC does (to 60)."""
     ethtype = dpkt.ethernet.ETH_TYPE_IP6 if (l3[0] >> 4) == 6 else dpkt.ethernet.ETH_TYPE_IP
-    frame = b"\x02\x00\x00\x00\x00\x02" + b"\x02\x00\x00\x00\x00\x01" + struct.pack(">H", ethtype) + l3
+    dst, src = b"\x02\x00\x00\x00\x00\x02", b"\x02\x00\x00\x00\x00\x01"
+    frame = dst + src + struct.pack(">H", ethtype) + l3
     return frame + b"\x00" * max(0, pad_to - len(frame))
 
 
@@ -63,5 +67,6 @@ def write_pcapng(path: Path, linktypes: list[int], packets: list[tuple[int, byte
         out += block(1, struct.pack("<HHI", lt, 0, 65535))
     for i, (iface, frame) in enumerate(packets):
         ts = (1_700_000_000 + i) * 1_000_000
-        out += block(6, struct.pack("<IIIII", iface, ts >> 32, ts & 0xFFFFFFFF, len(frame), len(frame)) + frame)
+        epb = struct.pack("<IIIII", iface, ts >> 32, ts & 0xFFFFFFFF, len(frame), len(frame))
+        out += block(6, epb + frame)
     path.write_bytes(out)

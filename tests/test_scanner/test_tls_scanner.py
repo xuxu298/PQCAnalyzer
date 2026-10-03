@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from src.scanner.models import TLSConnectionInfo, TLSInfo
 from src.scanner.tls_scanner import TLSScanner
 from src.utils.constants import RiskLevel
@@ -203,7 +205,11 @@ class TestProbePqGroupsBranches:
 
 
 def _leaf_der(
-    key, days_valid: int = 365, cn: str = "app.example.com", issuer_key=None, issuer_cn: str | None = None
+    key,
+    days_valid: int = 365,
+    cn: str = "app.example.com",
+    issuer_key=None,
+    issuer_cn: str | None = None,
 ) -> bytes:
     import datetime as dt
 
@@ -278,7 +284,9 @@ class TestLeafCertAnalysis:
     def test_intermediate_in_chain_is_assessed(self):
         ca_key = _rsa_key()
         leaf = _leaf_der(_rsa_key(), issuer_key=ca_key, issuer_cn="Issuing CA")
-        intermediate = _leaf_der(ca_key, cn="Issuing CA", issuer_key=_rsa_key(), issuer_cn="Root CA")
+        intermediate = _leaf_der(
+            ca_key, cn="Issuing CA", issuer_key=_rsa_key(), issuer_cn="Root CA",
+        )
         findings = self._findings(leaf, intermediate)
         keys = [f for f in findings if f.component == TLSInfo.CERT_PUBLIC_KEY]
         assert len(keys) == 2
@@ -358,3 +366,92 @@ class TestLeafCertAnalysis:
         finally:
             listener.close()
         assert info.cert_chain_der[0] == der
+
+
+class TestChainRobustness:
+    """Regressions from the 03/10 review of the chain analysis."""
+
+    RSA_OID = bytes.fromhex("06092a864886f70d010101")       # rsaEncryption
+    MLDSA65_OID = bytes.fromhex("0609608648016503040312")    # id-ml-dsa-65
+
+    def _analyze(self, *ders):
+        from src.scanner.cert_analyzer import CertAnalyzer
+
+        return CertAnalyzer().analyze_chain_bytes(list(ders), source="h.example:443")
+
+    def test_pq_key_cert_is_reported_not_fatal(self):
+        inter = _leaf_der(_rsa_key(), cn="PQ CA", issuer_key=_rsa_key(), issuer_cn="Root")
+        assert inter.count(self.RSA_OID) == 1
+        pq = inter.replace(self.RSA_OID, self.MLDSA65_OID)
+        infos, findings = self._analyze(_leaf_der(_rsa_key()), pq)
+        assert len(infos) == 2
+        keys = [f.algorithm for f in findings if f.component == TLSInfo.CERT_PUBLIC_KEY]
+        assert "ML-DSA-65" in keys
+
+    def test_duplicate_cert_assessed_once(self):
+        leaf = _leaf_der(_rsa_key())
+        infos, _ = self._analyze(leaf, leaf)
+        assert len(infos) == 1
+
+    def test_unparseable_leaf_keeps_positions(self):
+        ca_key = _rsa_key()
+        inter = _leaf_der(ca_key, cn="CA", issuer_key=_rsa_key(), issuer_cn="Root")
+        infos, _ = self._analyze(b"\x30\x03bad", inter)
+        assert [i.chain_position for i in infos] == ["intermediate"]
+
+    def test_root_self_signature_not_assessed(self):
+        root_key = _rsa_key()
+        root = _leaf_der(root_key, cn="Root")
+        leaf = _leaf_der(_rsa_key(), issuer_key=root_key, issuer_cn="Root")
+        _, findings = self._analyze(leaf, root)
+        root_findings = [f for f in findings if "root cert" in f.location]
+        assert root_findings and all(f.component != TLSInfo.CERT_SIGNATURE for f in root_findings)
+
+    def test_expired_intermediate_is_not_critical(self):
+        import datetime as dt
+
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.x509.oid import NameOID
+
+        key = _rsa_key()
+        now = dt.datetime.now(dt.timezone.utc)
+        expired = (
+            x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Old Cross-sign")]))
+            .issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Older Root")]))
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - dt.timedelta(days=900))
+            .not_valid_after(now - dt.timedelta(days=10))
+            .sign(_rsa_key(), hashes.SHA256())
+        ).public_bytes(serialization.Encoding.DER)
+        _, findings = self._analyze(_leaf_der(_rsa_key()), expired)
+        exp = [f for f in findings if f.algorithm == "Expired"]
+        assert exp and exp[0].risk_level != RiskLevel.CRITICAL
+
+    @pytest.mark.parametrize("sig,flagged", [
+        ("RSA-SHA1", "SHA-1"), ("sha1WithRSAEncryption", "SHA-1"), ("RSA-MD5", "MD5"),
+        ("RSA-SHA256", None), ("ECDSA-SHA384", None),
+    ])
+    def test_weak_signature_hash_flagged(self, sig, flagged):
+        from src.scanner.cert_analyzer import CertAnalyzer
+        from src.scanner.models import CertificateInfo
+
+        info = CertificateInfo(
+            subject={"commonName": "legacy.example"}, public_key_algorithm="RSA",
+            public_key_size=2048, signature_algorithm=sig, chain_position="leaf",
+        )
+        names = [f.algorithm for f in CertAnalyzer()._assess_cert(info, "h:443")]
+        if flagged:
+            assert f"{flagged} signature hash" in names
+        else:
+            assert not any("signature hash" in n for n in names)
+
+    def test_peer_chain_accepts_313_bytes_form(self):
+        der = _leaf_der(_rsa_key())
+
+        class FakeSock:
+            def get_unverified_chain(self):
+                return [der]
+
+        assert TLSScanner._peer_chain_der(FakeSock()) == [der]

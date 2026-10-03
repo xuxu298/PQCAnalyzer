@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import BinaryIO
 
 SUPPORTED_LINK_TYPES = {
+    0,    # BSD loopback / utun (DLT_NULL, host byte order AF header)
+    108,  # OpenBSD loopback (DLT_LOOP, network byte order AF header)
     1,    # Ethernet
     12,   # Raw IP (BSD)
     14,   # Raw IP (older)
@@ -51,17 +53,36 @@ class InvalidFilterError(ValueError):
 
 # The matcher recurses once per and/or, so bound the input.
 _MAX_FILTER_LEN = 256
-_FILTER_KEYWORDS = {"tcp", "udp", "port", "host", "and", "or"}
+# The built-in matcher only understands this subset of BPF. Anything else
+# (not, src/dst, net, parentheses, hostnames) used to be silently ignored or
+# mis-grouped — 'not port 22' matched everything — so reject it up front.
+_FILTER_WORDS = {"tcp", "udp", "port", "host", "and", "or"}
 
 
 def validate_bpf(bpf_filter: str) -> None:
-    """Reject filters the matcher would choke on, before reading any packet."""
+    """Reject filters the built-in matcher can't evaluate faithfully."""
+    import ipaddress
+    import re
+
     if len(bpf_filter) > _MAX_FILTER_LEN:
         raise InvalidFilterError(f"BPF filter longer than {_MAX_FILTER_LEN} characters")
-    tokens = bpf_filter.lower().replace("(", " ").replace(")", " ").split()
-    for prev, tok in zip([""] + tokens, tokens):
-        if prev == "port" and not (tok.isdigit() and int(tok) <= 65535):
-            raise InvalidFilterError(f"BPF port must be a number 0-65535, got {tok!r}")
+    if "(" in bpf_filter or ")" in bpf_filter:
+        raise InvalidFilterError("parentheses are not supported; use 'and'/'or' only")
+    tokens = bpf_filter.lower().split()
+    for prev, tok in zip([""] + tokens, tokens, strict=False):
+        if prev == "port":
+            # ASCII only: '²'.isdigit() is True but int('²') raises.
+            if not re.fullmatch(r"[0-9]{1,5}", tok) or int(tok) > 65535:
+                raise InvalidFilterError(f"BPF port must be a number 0-65535, got {tok!r}")
+        elif prev == "host":
+            try:
+                ipaddress.ip_address(tok)
+            except ValueError:
+                raise InvalidFilterError(f"BPF host must be an IP address, got {tok!r}") from None
+        elif tok not in _FILTER_WORDS:
+            raise InvalidFilterError(
+                f"unsupported BPF term {tok!r}; supported: tcp, udp, port N, host IP, and, or"
+            )
 
 
 class UnsupportedLinkTypeError(ValueError):
@@ -138,15 +159,16 @@ def read_pcap(
         ) from exc
 
     fh = path.open("rb")
+    link_state = {"supported": False, "unsupported": None}
     try:
         if fh.read(4) == _PCAPNG_SHB:
             fh.seek(0)
-            frames = _iter_pcapng(fh, path)
+            frames = _iter_pcapng(fh, path, link_state)
         else:
             fh.seek(0)
             frames = _iter_pcap(fh, path)
 
-        for linktype, ts, frame in frames:
+        for linktype, ts, frame in _guard_framing(frames, path):
             pkt = _decode(linktype, frame, ts)
             # Without libpcap there is no BPF compiler; apply the post-hoc
             # matcher inline so we stay streaming — buffering the whole
@@ -155,8 +177,26 @@ def read_pcap(
             if bpf_filter and not _match_bpf(pkt, bpf_filter):
                 continue
             yield pkt
+        # pcapng: classic pcap raises on an unsupported link type up front;
+        # match that instead of returning a silently empty capture.
+        if link_state["unsupported"] is not None and not link_state["supported"]:
+            raise UnsupportedLinkTypeError(link_state["unsupported"])
     finally:
         fh.close()
+
+
+def _guard_framing(frames: Iterator, path: Path) -> Iterator:
+    """Turn any parsing slip in the framing code into InvalidPCAPError.
+
+    The readers bounds-check what they know about; this catches what they
+    don't, so a hostile capture is a 400 at worst, never a 500.
+    """
+    try:
+        yield from frames
+    except (struct.error, IndexError, ValueError, OverflowError) as exc:
+        if isinstance(exc, (InvalidPCAPError, UnsupportedLinkTypeError)):
+            raise
+        raise InvalidPCAPError(f"{path}: malformed capture ({type(exc).__name__})") from exc
 
 
 def _iter_pcap(fh: BinaryIO, path: Path) -> Iterator[tuple[int, datetime, bytes]]:
@@ -191,7 +231,10 @@ class _Interface:
     tsoffset: int = 0
 
 
-def _iter_pcapng(fh: BinaryIO, path: Path) -> Iterator[tuple[int, datetime | None, bytes]]:
+def _iter_pcapng(
+    fh: BinaryIO, path: Path, link_state: dict | None = None
+) -> Iterator[tuple[int, datetime | None, bytes]]:
+    link_state = link_state if link_state is not None else {}
     endian: str | None = None
     interfaces: list[_Interface] = []
 
@@ -225,8 +268,15 @@ def _iter_pcapng(fh: BinaryIO, path: Path) -> Iterator[tuple[int, datetime | Non
         if endian is None:
             raise InvalidPCAPError(f"{path}: pcapng does not start with a section header")
         blk_type, blk_len = struct.unpack(endian + "II", head)
-        if blk_len < 12 or blk_len % 4 or blk_len > _MAX_RECORD:
+        if blk_len < 12 or blk_len % 4:
             return
+        if blk_len > _MAX_RECORD:
+            if blk_type in (2, 3, 6):
+                return  # a packet block this large is corruption
+            # Large non-packet blocks are legitimate (decryption secrets from
+            # `editcap --inject-secrets`, name resolution): skip, don't read.
+            fh.seek(blk_len - 8, 1)
+            continue
         body = fh.read(blk_len - 8)
         if len(body) < blk_len - 8:
             return  # truncated final block
@@ -239,6 +289,10 @@ def _iter_pcapng(fh: BinaryIO, path: Path) -> Iterator[tuple[int, datetime | Non
             iface = _Interface(linktype=linktype, snaplen=snaplen)
             _parse_idb_options(iface, body[8:], endian)
             interfaces.append(iface)
+            if linktype in SUPPORTED_LINK_TYPES:
+                link_state["supported"] = True
+            elif link_state.get("unsupported") is None:
+                link_state["unsupported"] = linktype
         elif blk_type == 6:  # Enhanced Packet Block
             if len(body) < 20:
                 return
@@ -273,6 +327,8 @@ def _parse_idb_options(iface: _Interface, opts: bytes, endian: str) -> None:
     pos = 0
     while pos + 4 <= len(opts):
         code, length = struct.unpack(endian + "HH", opts[pos:pos + 4])
+        if pos + 4 + length > len(opts):
+            return  # option claims more bytes than the block has
         value = opts[pos + 4:pos + 4 + length]
         if code == 0:
             return
@@ -293,6 +349,48 @@ def _pcapng_time(iface: _Interface, ticks: int) -> datetime | None:
         return None
 
 
+def _raw_ip(frame: bytes):
+    import dpkt
+
+    if not frame:
+        return None
+    version = frame[0] >> 4
+    if version == 4:
+        return dpkt.ip.IP(frame)
+    if version == 6:
+        return dpkt.ip6.IP6(frame)
+    return None
+
+
+def _decapsulate(l3):
+    """Strip one tunnel layer so the inner TLS/SSH flow is analysed.
+
+    Covers IP-in-IP, 6in4, GRE (incl. transparent Ethernet and ERSPAN II/III,
+    the usual feed from a remote SPAN) and VXLAN. Anything else, or a tunnel
+    whose inner packet doesn't decode, is returned unchanged.
+    """
+    import dpkt
+
+    inner = l3.data
+    candidate = None
+    if isinstance(inner, (dpkt.ip.IP, dpkt.ip6.IP6)):
+        candidate = inner
+    elif isinstance(inner, dpkt.gre.GRE):
+        payload = inner.data
+        if isinstance(payload, (dpkt.ip.IP, dpkt.ip6.IP6)):
+            candidate = payload
+        else:
+            raw = bytes(payload)
+            skip = {0x6558: 0, 0x88BE: 8, 0x22EB: 12}.get(inner.p)
+            if skip is not None:
+                candidate = dpkt.ethernet.Ethernet(raw[skip:]).data
+    elif isinstance(inner, dpkt.udp.UDP) and inner.dport == 4789 and len(inner.data) > 8:
+        candidate = dpkt.ethernet.Ethernet(bytes(inner.data)[8:]).data
+    if isinstance(candidate, (dpkt.ip.IP, dpkt.ip6.IP6)):
+        return candidate
+    return l3
+
+
 def _decode(linktype: int, frame: bytes, ts: datetime | None) -> Packet:
     """Decode a link-layer frame down to TCP/UDP. Never raises on bad bytes."""
     import dpkt
@@ -308,16 +406,16 @@ def _decode(linktype: int, frame: bytes, ts: datetime | None) -> Packet:
             l3 = dpkt.ip.IP(frame)
         elif linktype == 229:
             l3 = dpkt.ip6.IP6(frame)
-        elif linktype in (12, 14, 101) and frame:
-            version = frame[0] >> 4
-            if version == 4:
-                l3 = dpkt.ip.IP(frame)
-            elif version == 6:
-                l3 = dpkt.ip6.IP6(frame)
-            else:
-                return Packet(ts)
+        elif linktype in (12, 14, 101):
+            l3 = _raw_ip(frame)
+        elif linktype in (0, 108):
+            # 4-byte address-family header (byte order varies by OS); the IP
+            # version nibble that follows is the reliable signal.
+            l3 = _raw_ip(frame[4:])
         else:
             return Packet(ts)
+        if l3 is not None:
+            l3 = _decapsulate(l3)
     except Exception:  # capture bytes are untrusted; any decode failure is "not IP"
         return Packet(ts)
 
@@ -399,4 +497,7 @@ def _port_match(pkt: Packet, port: int) -> bool:
 def _host_match(pkt: Packet, host: str) -> bool:
     if pkt.src is None:
         return False
-    return pkt.src == host or pkt.dst == host
+    import ipaddress
+
+    want = ipaddress.ip_address(host)  # validated by validate_bpf
+    return any(ipaddress.ip_address(a) == want for a in (pkt.src, pkt.dst) if a)
