@@ -84,6 +84,10 @@ class AlgorithmDatabase:
         rsa_match = re.search(r"RSA[- ]?(\d{4})", name)
         if rsa_match:
             return self.lookup(f"RSA-{rsa_match.group(1)}")
+        # Signature names ("RSA-SHA256", "sha256WithRSAEncryption"): the risk
+        # is the RSA signing key, not the hash — don't fall through to SHA-*.
+        if re.search(r"^RSA(-PSS)?-SHA|WITHRSA", name):
+            return self.lookup("RSA-2048")
         if "RSA" in name and not any(c.isdigit() for c in name):
             return self.lookup("RSA-2048")  # Default RSA assumption
 

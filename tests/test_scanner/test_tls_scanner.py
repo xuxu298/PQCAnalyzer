@@ -200,3 +200,161 @@ class TestProbePqGroupsBranches:
     def test_probe_exception_marks_passive(self, monkeypatch):
         info = self._run(monkeypatch, RuntimeError("socket boom"))
         assert info.detection_mode == "passive"
+
+
+def _leaf_der(
+    key, days_valid: int = 365, cn: str = "app.example.com", issuer_key=None, issuer_cn: str | None = None
+) -> bytes:
+    import datetime as dt
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509.oid import NameOID
+
+    now = dt.datetime.now(dt.timezone.utc)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+    issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, issuer_cn or cn)])
+    signer = issuer_key or key
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - dt.timedelta(days=1))
+        .not_valid_after(now + dt.timedelta(days=days_valid))
+        .sign(signer, None if _is_eddsa(signer) else hashes.SHA256())
+    )
+    return cert.public_bytes(serialization.Encoding.DER)
+
+
+def _is_eddsa(key) -> bool:
+    from cryptography.hazmat.primitives.asymmetric import ed448, ed25519
+
+    return isinstance(key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey))
+
+
+def _rsa_key():
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    return rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+class TestLeafCertAnalysis:
+    """The endpoint scan must assess the server cert, not just the cipher suite."""
+
+    def _findings(self, *ders: bytes):
+        info = TLSConnectionInfo(
+            protocol_version="TLSv1.3",
+            cipher_suite="TLS_AES_256_GCM_SHA384",
+            key_exchange="ECDHE",
+            cert_chain_der=list(ders),
+        )
+        return TLSScanner()._analyze(info, "app.example.com:443")
+
+    def test_rsa_leaf_reports_key_and_signature(self):
+        findings = self._findings(_leaf_der(_rsa_key()))
+        by_component = {f.component: f for f in findings}
+        assert by_component[TLSInfo.CERT_PUBLIC_KEY].algorithm == "RSA-2048"
+        assert by_component[TLSInfo.CERT_PUBLIC_KEY].quantum_vulnerable
+        assert by_component[TLSInfo.CERT_SIGNATURE].algorithm == "RSA-SHA256"
+
+    def test_ecdsa_leaf_reports_curve(self):
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        findings = self._findings(_leaf_der(ec.generate_private_key(ec.SECP256R1())))
+        key = next(f for f in findings if f.component == TLSInfo.CERT_PUBLIC_KEY)
+        assert key.algorithm.startswith("ECDSA-secp256r1")
+        assert key.quantum_vulnerable
+
+    def test_ed25519_leaf_is_quantum_vulnerable(self):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        findings = self._findings(_leaf_der(ed25519.Ed25519PrivateKey.generate()))
+        key = next(f for f in findings if f.component == TLSInfo.CERT_PUBLIC_KEY)
+        assert key.algorithm.startswith("Ed25519")
+        assert key.quantum_vulnerable
+
+    def test_intermediate_in_chain_is_assessed(self):
+        ca_key = _rsa_key()
+        leaf = _leaf_der(_rsa_key(), issuer_key=ca_key, issuer_cn="Issuing CA")
+        intermediate = _leaf_der(ca_key, cn="Issuing CA", issuer_key=_rsa_key(), issuer_cn="Root CA")
+        findings = self._findings(leaf, intermediate)
+        keys = [f for f in findings if f.component == TLSInfo.CERT_PUBLIC_KEY]
+        assert len(keys) == 2
+        assert "leaf cert" in keys[0].location
+        # last cert sent is not self-signed, so it is an intermediate, not a root
+        assert "intermediate cert" in keys[1].location
+
+    def test_bad_intermediate_does_not_hide_leaf(self):
+        findings = self._findings(_leaf_der(_rsa_key()), b"\x30\x03junk")
+        assert any(f.component == TLSInfo.CERT_PUBLIC_KEY for f in findings)
+
+    def test_expiring_soon_flagged(self):
+        findings = self._findings(_leaf_der(_rsa_key(), days_valid=10))
+        assert any(f.algorithm == "Expiring soon" for f in findings)
+
+    def test_valid_cert_not_flagged_expiring(self):
+        findings = self._findings(_leaf_der(_rsa_key()))
+        assert not any(f.algorithm == "Expiring soon" for f in findings)
+
+    def test_malformed_der_keeps_cipher_findings(self):
+        findings = self._findings(b"\x30\x03not-a-cert")
+        assert not any(f.component == TLSInfo.CERT_PUBLIC_KEY for f in findings)
+        assert any(f.component == TLSInfo.KEY_EXCHANGE for f in findings)
+
+    def test_live_handshake_captures_leaf_der(self, tmp_path, monkeypatch):
+        # Regression: getpeercert() is {} under CERT_NONE, so the cert used
+        # to be invisible to the endpoint scan.
+        import socket
+        import ssl
+        import threading
+
+        from cryptography.hazmat.primitives import serialization
+
+        from src.config import ScanConfig
+
+        key = _rsa_key()
+        der = _leaf_der(key, cn="localhost")
+        cert_pem = tmp_path / "c.pem"
+        key_pem = tmp_path / "k.pem"
+        cert_pem.write_text(ssl.DER_cert_to_PEM_cert(der))
+        key_pem.write_bytes(key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        ))
+        server_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        server_ctx.load_cert_chain(cert_pem, key_pem)
+
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(8)
+        listener.settimeout(5)
+        port = listener.getsockname()[1]
+
+        def serve():
+            while True:
+                try:
+                    conn, _ = listener.accept()
+                except OSError:
+                    return
+                try:
+                    with server_ctx.wrap_socket(conn, server_side=True) as tls:
+                        tls.recv(1)
+                except (ssl.SSLError, OSError):
+                    pass
+
+        threading.Thread(target=serve, daemon=True).start()
+        try:
+            from src.scanner import tls_scanner as ts
+
+            def no_probe(*args, **kwargs):
+                raise OSError("probe disabled in test")
+
+            monkeypatch.setattr(ts, "probe_x25519mlkem768", no_probe)
+            scanner = TLSScanner(config=ScanConfig(timeout_ms=3000))
+            info = scanner._connect_and_extract("127.0.0.1", port)
+        finally:
+            listener.close()
+        assert info.cert_chain_der[0] == der

@@ -93,6 +93,35 @@ class CertAnalyzer:
         findings = self._assess_cert(cert_info, source)
         return cert_info, findings
 
+    def analyze_chain_bytes(
+        self, chain_der: list[bytes], source: str = "remote"
+    ) -> tuple[list[CertificateInfo], list[Finding]]:
+        """Analyze a DER chain as sent by a server, leaf first.
+
+        Certs that fail to parse are skipped so one bad intermediate does
+        not hide the rest of the chain.
+        """
+        infos: list[CertificateInfo] = []
+        findings: list[Finding] = []
+        for i, der in enumerate(chain_der):
+            try:
+                cert = x509.load_der_x509_certificate(der)
+            except ValueError as exc:
+                logger.warning("Skipping unparseable cert %d from %s: %s", i, source, exc)
+                continue
+            # Servers rarely send the root, so the last cert is usually an
+            # intermediate; only a self-signed cert counts as root here.
+            if i == 0:
+                position = "leaf"
+            elif cert.subject == cert.issuer:
+                position = "root"
+            else:
+                position = "intermediate"
+            info = self._parse_cert(cert, position)
+            infos.append(info)
+            findings.extend(self._assess_cert(info, source))
+        return infos, findings
+
     def _load_certs(self, data: bytes) -> list[x509.Certificate]:
         """Load certificates from PEM or DER data."""
         certs: list[x509.Certificate] = []

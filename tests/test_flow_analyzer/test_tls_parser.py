@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from src.flow_analyzer.handshake_parser.tls_parser import (
     HYBRID_PQC_GROUPS,
+    NAMED_GROUPS,
     extract_crypto,
     parse_tls_client_hello,
     parse_tls_server_hello,
@@ -188,6 +189,17 @@ def test_parse_returns_none_on_garbage() -> None:
 def test_hybrid_pqc_group_labels_stable() -> None:
     # Guardrail: if we change codepoint → label mapping, these known-good names must remain.
     assert "X25519MLKEM768" in HYBRID_PQC_GROUPS
+
+
+def test_pre_standard_kyber_codepoints_match_iana() -> None:
+    # IANA TLS Supported Groups 25497/25498 — these were once shifted by one.
+    assert NAMED_GROUPS[0x6399] == "X25519Kyber768Draft00"
+    assert NAMED_GROUPS[0x639A] == "SecP256r1Kyber768Draft00"
+
+
+def test_every_hybrid_label_is_reachable_from_a_codepoint() -> None:
+    # A hybrid label no codepoint maps to means the table drifted.
+    assert HYBRID_PQC_GROUPS <= set(NAMED_GROUPS.values())
 
 
 def test_parse_handles_fragmented_records() -> None:

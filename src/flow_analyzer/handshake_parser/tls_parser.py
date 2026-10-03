@@ -47,8 +47,11 @@ NAMED_GROUPS: dict[int, str] = {
     # Cloudflare blog 2023-09 + 2024-09, Chrome platform-status.
     0x11EB: "SecP256r1MLKEM768",         # IANA 4587
     0x11EC: "X25519MLKEM768",            # IANA 4588, post-FIPS 203
-    0x6399: "SecP256r1Kyber768Draft00",  # Chrome pre-standardization draft
-    0x639A: "SecP384r1Kyber768Draft00",
+    # Pre-standard Kyber hybrids, IANA TLS Supported Groups 25497/25498.
+    # These were previously shifted by one entry, so the most widely deployed
+    # pre-standard hybrid (0x6399) was reported under the wrong group name.
+    0x6399: "X25519Kyber768Draft00",      # Chrome/Cloudflare 2023-24, now obsolete
+    0x639A: "SecP256r1Kyber768Draft00",   # IANA Recommended = D (discouraged)
 }
 
 HYBRID_PQC_GROUPS = {
@@ -56,7 +59,6 @@ HYBRID_PQC_GROUPS = {
     "SecP256r1MLKEM768",
     "X25519Kyber768Draft00",
     "SecP256r1Kyber768Draft00",
-    "SecP384r1Kyber768Draft00",
 }
 
 PURE_PQC_GROUPS = {

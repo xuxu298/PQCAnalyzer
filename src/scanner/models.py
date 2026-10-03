@@ -167,7 +167,11 @@ class TLSConnectionInfo:
     mac_algorithm: str = ""
     supported_protocols: list[str] = field(default_factory=list)
     supported_ciphers: list[str] = field(default_factory=list)
-    certificate_chain: list[dict] = field(default_factory=list)
+    # DER chain as sent by the peer, leaf first. getpeercert() returns {}
+    # under CERT_NONE, so the binary form is the only way to see the certs.
+    cert_chain_der: list[bytes] = field(default_factory=list)
+    # Parsed form of cert_chain_der, filled in by the analysis step.
+    certificate_chain: list[CertificateInfo] = field(default_factory=list)
     # How the key_exchange value was established. See Finding.detection_mode.
     detection_mode: str = ""
 

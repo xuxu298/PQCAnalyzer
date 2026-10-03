@@ -8,8 +8,10 @@ import socket
 import ssl
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from src.config import ScanConfig
+from src.scanner.cert_analyzer import CertAnalyzer
 from src.scanner.models import (
     Finding,
     ScanResult,
@@ -55,6 +57,18 @@ class TLSScanner:
                 "protocol_version": tls_info.protocol_version,
                 "cipher_suite": tls_info.cipher_suite,
                 "supported_protocols": tls_info.supported_protocols,
+                "certificate_chain": [
+                    {
+                        "position": c.chain_position,
+                        "subject": c.subject.get("commonName", ""),
+                        "issuer": c.issuer.get("commonName", ""),
+                        "public_key_algorithm": c.public_key_algorithm,
+                        "public_key_size": c.public_key_size,
+                        "signature_algorithm": c.signature_algorithm,
+                        "not_after": c.not_after,
+                    }
+                    for c in tls_info.certificate_chain
+                ],
             }
         except socket.timeout:
             result.status = ScanStatus.TIMEOUT
@@ -120,11 +134,7 @@ class TLSScanner:
                 # Parse cipher suite components
                 self._parse_cipher_suite(info, negotiated_group)
 
-                # Get certificate chain
-                cert_bin = ssock.getpeercert(binary_form=True)
-                cert_dict = ssock.getpeercert()
-                if cert_dict:
-                    info.certificate_chain.append(cert_dict)
+                info.cert_chain_der = self._peer_chain_der(ssock)
 
         # Probe for supported protocols
         info.supported_protocols = self._probe_protocols(host, port, timeout_sec)
@@ -140,6 +150,27 @@ class TLSScanner:
             self._probe_pq_groups(info, host, port, timeout_sec)
 
         return info
+
+    @staticmethod
+    def _peer_chain_der(ssock: ssl.SSLSocket) -> list[bytes]:
+        """DER certs the peer sent, leaf first.
+
+        get_unverified_chain() is public from Python 3.13 and exists on the
+        private _sslobj since 3.10; fall back to the leaf alone otherwise.
+        """
+        get_chain = getattr(ssock, "get_unverified_chain", None) or getattr(
+            getattr(ssock, "_sslobj", None), "get_unverified_chain", None
+        )
+        if get_chain is not None:
+            try:
+                chain = get_chain() or []
+                ders = [c.public_bytes(ssl._ssl.ENCODING_DER) for c in chain]
+                if ders:
+                    return ders
+            except Exception as exc:
+                logger.debug("Could not read peer chain: %s", exc)
+        leaf = ssock.getpeercert(binary_form=True)
+        return [leaf] if leaf else []
 
     def _probe_pq_groups(
         self, info: TLSConnectionInfo, host: str, port: int, timeout: float
@@ -326,60 +357,44 @@ class TLSScanner:
                     note=algo_info.note_en,
                 ))
 
-        # Check certificate from chain
-        if info.certificate_chain:
-            cert = info.certificate_chain[0]
-            self._analyze_cert_from_dict(cert, target, findings)
+        if info.cert_chain_der:
+            self._analyze_cert_chain(info, target, findings)
 
         return findings
 
-    def _analyze_cert_from_dict(
-        self, cert: dict, target: str, findings: list[Finding]
+    def _analyze_cert_chain(
+        self, info: TLSConnectionInfo, target: str, findings: list[Finding]
     ) -> None:
-        """Analyze certificate information from ssl.getpeercert() dict."""
-        db = get_algorithm_db()
+        """Assess the certs the server sent: public key, signature, expiry.
 
-        # The ssl module's getpeercert() returns limited info.
-        # We can get subject, issuer, notBefore, notAfter, serialNumber
-        # but not the signature algorithm or public key details directly.
-        # For full cert analysis, use cert_analyzer.py with the binary cert.
-        # Here we add a note that deeper analysis is available.
+        The key and signature are the authentication half of the PQ problem,
+        which the cipher suite alone never shows under TLS 1.3.
+        """
+        certs, cert_findings = CertAnalyzer().analyze_chain_bytes(
+            info.cert_chain_der, source=target
+        )
+        findings.extend(cert_findings)
+        info.certificate_chain = certs
 
-        subject = dict(x[0] for x in cert.get("subject", ()))
-        issuer = dict(x[0] for x in cert.get("issuer", ()))
-        cn = subject.get("commonName", "unknown")
-
-        # Check expiry
-        not_after = cert.get("notAfter", "")
-        if not_after:
-            from datetime import datetime
-            try:
-                expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z")
-                days_left = (expiry - datetime.utcnow()).days
-                if days_left < 0:
-                    findings.append(Finding(
-                        component=TLSInfo.CERTIFICATE,
-                        algorithm="Expired",
-                        risk_level=RiskLevel.CRITICAL,
-                        quantum_vulnerable=False,
-                        location=f"{target}, CN={cn}",
-                        replacement=["Renew certificate"],
-                        migration_priority=1,
-                        note=t("cert_expired", date=not_after),
-                    ))
-                elif days_left < 30:
-                    findings.append(Finding(
-                        component=TLSInfo.CERTIFICATE,
-                        algorithm="Expiring soon",
-                        risk_level=RiskLevel.MEDIUM,
-                        quantum_vulnerable=False,
-                        location=f"{target}, CN={cn}",
-                        replacement=["Renew certificate"],
-                        migration_priority=2,
-                        note=t("cert_expiring_soon", days=days_left),
-                    ))
-            except ValueError:
-                pass
+        # CertAnalyzer flags expired certs; endpoints also get the 30-day warning.
+        if not certs or certs[0].chain_position != "leaf" or certs[0].is_expired:
+            return
+        leaf = certs[0]
+        days_left = (
+            datetime.fromisoformat(leaf.not_after) - datetime.now(timezone.utc)
+        ).days
+        if days_left < 30:
+            cn = leaf.subject.get("commonName", "unknown")
+            findings.append(Finding(
+                component=TLSInfo.CERTIFICATE,
+                algorithm="Expiring soon",
+                risk_level=RiskLevel.MEDIUM,
+                quantum_vulnerable=False,
+                location=f"{target}, CN={cn}",
+                replacement=["Renew certificate"],
+                migration_priority=2,
+                note=t("cert_expiring_soon", days=days_left),
+            ))
 
     def scan_hosts(self, targets: list[str]) -> list[ScanResult]:
         """Scan multiple hosts sequentially with delay between requests.

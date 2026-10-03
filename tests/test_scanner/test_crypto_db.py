@@ -34,7 +34,11 @@ class TestAlgorithmDatabase:
         assert db.lookup("NONEXISTENT-ALGO") is None
 
     def test_classify_rsa_variants(self, db):
-        assert db.classify("sha256WithRSAEncryption") is not None
+        # The risk of an RSA signature is the RSA key, never the hash.
+        for sig in ("sha256WithRSAEncryption", "RSA-SHA256", "RSA-SHA384", "RSA-SHA1"):
+            info = db.classify(sig)
+            assert info is not None and info.name.startswith("RSA"), sig
+            assert info.quantum_vulnerable, sig
         info = db.classify("RSA")
         assert info is not None
         assert "RSA" in info.name

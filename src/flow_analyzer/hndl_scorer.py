@@ -57,7 +57,6 @@ KEX_VULNERABILITY: dict[str, float] = {
     "X25519MLKEM768": 0.1,
     "X25519Kyber768Draft00": 0.1,
     "SecP256r1Kyber768Draft00": 0.1,
-    "SecP384r1Kyber768Draft00": 0.1,
     "sntrup761x25519-sha512@openssh.com": 0.1,
     "mlkem768x25519-sha256": 0.1,
     "mlkem768nistp256-sha256": 0.1,
