@@ -111,7 +111,7 @@ docker run pqc-analyzer scan tls example.com
 Install benchmark dependencies: `pip install -e ".[benchmark]"`
 
 **"WeasyPrint not found"**
-Report generation is available in the Enterprise Edition. Contact support@vradar.io.
+Report generation is available in the Enterprise Edition. Contact support@atkvn.com.
 
 ---
 

@@ -2,7 +2,7 @@
 
 The REST API is available in the **Enterprise Edition** only.
 
-For enterprise licensing, contact: **support@vradar.io**
+For enterprise licensing, contact: **support@atkvn.com**
 
 ## Community Edition
 

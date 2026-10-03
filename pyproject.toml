@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Nguyen Dong", email = "support@vradar.io" },
+    { name = "Nguyen Dong", email = "support@atkvn.com" },
 ]
 keywords = [
     "post-quantum",

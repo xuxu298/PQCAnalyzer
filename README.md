@@ -73,7 +73,7 @@ licensed edition built on the same scanner core, which adds:
 
 Found a bug or have a question? Open an issue: https://github.com/xuxu298/PQCAnalyzer/issues
 
-VPQ Audit: **https://vpqaudit.atkvn.com** · dongnx@atkvn.com
+VPQ Audit: **https://vpqaudit.atkvn.com** · support@atkvn.com
 
 ## Why This Tool?
 
@@ -332,7 +332,7 @@ pqc-analyzer benchmark kem --iterations 1000
 
 Gặp lỗi hoặc có câu hỏi? Mở một issue: https://github.com/xuxu298/PQCAnalyzer/issues
 
-Bản này được duy trì để sửa lỗi; tính năng mới nằm ở **[VPQ Audit](https://vpqaudit.atkvn.com)**. Liên hệ **dongnx@atkvn.com**.
+Bản này được duy trì để sửa lỗi; tính năng mới nằm ở **[VPQ Audit](https://vpqaudit.atkvn.com)**. Liên hệ **support@atkvn.com**.
 
 ---
 
@@ -340,7 +340,7 @@ Bản này được duy trì để sửa lỗi; tính năng mới nằm ở **[V
 
 PQCAnalyzer is built and maintained by [Nguyen Dong](https://www.linkedin.com/in/dongnx/), founder of **Vradar.io** — an AI-assisted SOC platform with built-in post-quantum log transport (ML-KEM-768 + ML-DSA-65, FIPS 203/204) for enterprise customers in Vietnam and APAC.
 
-For VPQ Audit, the licensed edition (certificate estate, CBOM/PDF reports, remediation, web UI, on-prem and air-gapped deployment): **https://vpqaudit.atkvn.com** · dongnx@atkvn.com.
+For VPQ Audit, the licensed edition (certificate estate, CBOM/PDF reports, remediation, web UI, on-prem and air-gapped deployment): **https://vpqaudit.atkvn.com** · support@atkvn.com.
 
 ---
 

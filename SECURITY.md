@@ -9,10 +9,10 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in VN-PQC Readiness Analyzer, please report it responsibly:
+If you discover a security vulnerability in PQCAnalyzer, please report it responsibly:
 
 1. **DO NOT** open a public GitHub issue
-2. Email **support@vradar.io** or use [GitHub Security Advisories](https://github.com/xuxu298/PQCAnalyzer/security/advisories) to report privately
+2. Email **security@atkvn.com** or use [GitHub Security Advisories](https://github.com/xuxu298/PQCAnalyzer/security/advisories) to report privately
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce

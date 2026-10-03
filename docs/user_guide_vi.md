@@ -104,7 +104,7 @@ docker run pqc-analyzer scan tls example.vn
 Cai dat: `pip install -e ".[benchmark]"`
 
 **"WeasyPrint not found"**
-Tinh nang bao cao co trong phien ban Enterprise. Lien he support@vradar.io.
+Tinh nang bao cao co trong phien ban Enterprise. Lien he support@atkvn.com.
 
 ---
 
