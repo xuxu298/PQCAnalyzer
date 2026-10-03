@@ -28,6 +28,7 @@ import logging
 import os
 import socket
 import struct
+import time
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -167,7 +168,10 @@ def _probe_one(
     try:
         with socket.create_connection((host, port), timeout=timeout) as sock:
             sock.sendall(ch)
-            record = _read_record(sock)
+            # One deadline for the whole read: the socket timeout alone applies
+            # per recv(), so a server trickling a byte at a time could hold the
+            # probe open indefinitely.
+            record = _read_record(sock, deadline=time.monotonic() + timeout)
     except (socket.timeout, OSError) as exc:
         return ProbeResult(None, False, error=str(exc))
 
@@ -283,18 +287,29 @@ def _ext_ec_point_formats() -> bytes:
     return struct.pack(">HH", 0x000B, len(body)) + body
 
 
-def _read_record(sock: socket.socket) -> bytes:
-    header = _recv_n(sock, 5)
+# RFC 8446 §5.2: a record is at most 2^14 + 256 bytes (plaintext 2^14).
+MAX_RECORD = 2**14 + 256
+
+
+def _read_record(sock: socket.socket, deadline: float | None = None) -> bytes:
+    header = _recv_n(sock, 5, deadline)
     if len(header) < 5:
         return b""
     length = int.from_bytes(header[3:5], "big")
-    body = _recv_n(sock, length)
+    if length > MAX_RECORD:
+        raise OSError(f"TLS record length {length} exceeds the protocol maximum")
+    body = _recv_n(sock, length, deadline)
     return header + body
 
 
-def _recv_n(sock: socket.socket, n: int) -> bytes:
+def _recv_n(sock: socket.socket, n: int, deadline: float | None = None) -> bytes:
     buf = b""
     while len(buf) < n:
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("probe deadline exceeded")
+            sock.settimeout(remaining)
         chunk = sock.recv(n - len(buf))
         if not chunk:
             break
