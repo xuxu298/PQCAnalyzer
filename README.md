@@ -59,19 +59,21 @@ Cloudflare and Google now serve hybrid `X25519MLKEM768` (IANA 0x11EC) by default
 - **Bilingual** — Vietnamese/English support
 - **JSON output** — Scan results and roadmaps exported as structured JSON
 
-### Enterprise Edition
+### VPQ Audit (commercial edition)
 
-For government and enterprise clients, we offer additional modules:
+This repository is the free edition: maintained for bug fixes, under the MIT
+License. New features land in **[VPQ Audit](https://vpqaudit.atkvn.com)**, the
+licensed edition built on the same scanner core, which adds:
 
-- **REST API** — FastAPI backend for integration
-- **Web UI** — React dashboard with interactive charts, risk heatmaps, benchmark visualizations
-- **Report Generator** — HTML (dark theme), PDF (WeasyPrint), SARIF (CI/CD), Executive Summary
-- **Docker Compose** — Multi-service deployment with web frontend
-- **Custom branding** — Tailored report templates and UI for your organization
+- **Certificate & key estate** — certificates from file systems, TLS endpoints and LDAP/AD, de-duplicated, with the CA hierarchy and the blast radius of each CA key
+- **Reports** — CycloneDX 1.7 CBOM (certificates as `certificate` assets), PDF/HTML executive reports, SARIF for CI
+- **Remediation** — configuration bundles and playbooks to move services to hybrid post-quantum key exchange, and before/after reports that show what was closed
+- **Operations** — web UI, multi-tenant, OIDC SSO, role-based access, hash-chained audit log, scheduled scans with webhook alerts
+- **Deployment** — on-premises Docker or an offline (air-gapped) bundle; assessment data stays in your environment
 
 Found a bug or have a question? Open an issue: https://github.com/xuxu298/PQCAnalyzer/issues
 
-Contact: **support@vradar.io** for enterprise licensing.
+VPQ Audit: **https://vpqaudit.atkvn.com** · dongnx@atkvn.com
 
 ## Why This Tool?
 
@@ -285,7 +287,7 @@ Công cụ mã nguồn mở giúp quét thuật toán mật mã trong hạ tần
 
 ### Phiên bản
 
-| | Community (mã nguồn mở) | Enterprise (liên hệ) |
+| | Community (mã nguồn mở) | VPQ Audit (bản thương mại) |
 |---|---|---|
 | Scanner (TLS, SSH, VPN, Code) | Có | Có |
 | Flow Analysis (PCAP → HNDL score) | Có | Có |
@@ -293,11 +295,12 @@ Công cụ mã nguồn mở giúp quét thuật toán mật mã trong hạ tần
 | Roadmap + Chi phí + Tuân thủ | Có | Có |
 | CLI | Có | Có |
 | JSON output | Có | Có |
-| **REST API** | - | **Có** |
-| **Web UI (React dashboard)** | - | **Có** |
-| **Báo cáo HTML/PDF/SARIF** | - | **Có** |
-| **Tóm tắt Điều hành** | - | **Có** |
-| **Tuỳ chỉnh thương hiệu** | - | **Có** |
+| **Kho chứng thư (tệp, TLS, LDAP/AD) + cây CA** | - | **Có** |
+| **CBOM CycloneDX 1.7, báo cáo PDF/HTML, SARIF** | - | **Có** |
+| **Gói cấu hình khắc phục + báo cáo trước/sau** | - | **Có** |
+| **Web UI, đa đơn vị, SSO, phân quyền, nhật ký kiểm toán** | - | **Có** |
+| **Quét theo lịch + cảnh báo webhook** | - | **Có** |
+| **Cài tại chỗ / bản offline (air-gap)** | - | **Có** |
 
 ### Cài đặt nhanh
 
@@ -329,7 +332,7 @@ pqc-analyzer benchmark kem --iterations 1000
 
 Gặp lỗi hoặc có câu hỏi? Mở một issue: https://github.com/xuxu298/PQCAnalyzer/issues
 
-Liên hệ **support@vradar.io** để sử dụng phiên bản Enterprise.
+Bản này được duy trì để sửa lỗi; tính năng mới nằm ở **VPQ Audit**. Liên hệ **dongnx@dataq.vn**.
 
 ---
 
@@ -337,7 +340,7 @@ Liên hệ **support@vradar.io** để sử dụng phiên bản Enterprise.
 
 PQCAnalyzer is built and maintained by [Nguyen Dong](https://www.linkedin.com/in/dongnx/), founder of **Vradar.io** — an AI-assisted SOC platform with built-in post-quantum log transport (ML-KEM-768 + ML-DSA-65, FIPS 203/204) for enterprise customers in Vietnam and APAC.
 
-For PQCAnalyzer Enterprise (REST API, Web UI, reports, on-prem deploy): **support@vradar.io**.
+For VPQ Audit, the licensed edition (certificate estate, CBOM/PDF reports, remediation, web UI, on-prem and air-gapped deployment): **https://vpqaudit.atkvn.com** · dongnx@atkvn.com.
 
 ---
 

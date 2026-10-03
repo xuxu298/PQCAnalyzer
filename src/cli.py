@@ -106,6 +106,13 @@ def _print_findings_table(findings: list) -> None:
     console.print(table)
 
 
+UPGRADE_HINT = (
+    "Need the estate view — certificate inventory across hosts and AD, CBOM/PDF reports, "
+    "remediation bundles, before/after evidence, a web UI with SSO? → VPQ Audit: "
+    "https://vpqaudit.atkvn.com"
+)
+
+
 def _print_summary(summary) -> None:
     """Print scan summary."""
     console.print()
@@ -126,6 +133,7 @@ def _print_summary(summary) -> None:
     console.print(
         "\n[dim]PQCAnalyzer by Vradar.io — AI SOC with post-quantum log transport · https://vradar.io[/dim]"
     )
+    console.print(f"[dim]{UPGRADE_HINT}[/dim]")
 
 
 def _save_output(data: dict, output_path: str | None) -> None:
