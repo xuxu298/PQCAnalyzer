@@ -3,7 +3,7 @@
 import pytest
 
 from src.utils.constants import RiskLevel
-from src.utils.crypto_db import AlgorithmDatabase
+from src.utils.crypto_db import AlgorithmDatabase, get_algorithm_db
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ class TestAlgorithmDatabase:
         assert len(all_algos) >= 30
 
     def test_version(self, db):
-        assert db.version == "1.1.0"
+        assert db.version == "1.2.0"
 
     def test_lookup_exact(self, db):
         info = db.lookup("RSA-2048")
@@ -168,3 +168,27 @@ class TestAlgorithmDatabase:
         info2 = db.classify("HMAC-SHA256")
         assert info2 is not None
         assert info2.risk_level == RiskLevel.SAFE
+
+
+class TestReplacementByRole:
+    """An RSA certificate signature was told to move to
+    'ML-KEM-768, ML-DSA-65' -- a KEM cannot sign."""
+
+    def test_rsa_signature_role_is_ml_dsa_only(self):
+        db = get_algorithm_db()
+        for name in ("RSA-1024", "RSA-2048", "RSA-3072", "RSA-4096", "sha256WithRSAEncryption"):
+            rep = db.classify(name).replacement_for("signature")
+            assert rep and all(r.startswith("ML-DSA") for r in rep), (name, rep)
+
+    def test_rsa_key_exchange_role_is_kem_only(self):
+        db = get_algorithm_db()
+        for name in ("RSA-2048", "RSA-4096"):
+            rep = db.classify(name).replacement_for("key_exchange")
+            assert rep and not any("DSA" in r for r in rep), (name, rep)
+
+    def test_unknown_role_and_single_role_entries_keep_generic(self):
+        db = get_algorithm_db()
+        rsa = db.lookup("RSA-2048")
+        assert rsa.replacement_for("") == rsa.replacement
+        ecdsa = db.lookup("ECDSA-P256")
+        assert ecdsa.replacement_for("signature") == ecdsa.replacement

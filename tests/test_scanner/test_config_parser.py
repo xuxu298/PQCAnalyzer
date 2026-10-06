@@ -72,3 +72,51 @@ class TestConfigParser:
     def test_metadata_includes_config_type(self, parser):
         result = parser.scan_file(str(FIXTURES_DIR / "nginx_legacy.conf"))
         assert result.metadata.get("config_type") == "nginx"
+
+
+# `ssl_protocols?\s+([^;]+);` was quadratic in the file size (260 KB of
+# `ssl_protocol ` without `;` => 16 s; 8 MB => hours). The forward scans that
+# replace it must read exactly what the regexes read.
+
+def test_value_scans_match_the_old_regexes():
+    import random
+    import re
+
+    from src.scanner.config_parser import _NGINX_CIPHERS, _NGINX_PROTOCOLS, _first_nginx_value
+
+    rnd = random.Random(3)
+    atoms = ["ssl_protocols ", "ssl_protocol ", "ssl_ciphers ", "ssl_cipher ", ";", "'", '"',
+             " ", "  ", "\n", "TLSv1", "RC4-SHA", "x", "\t"]
+    for _ in range(30000):
+        c = "".join(rnd.choice(atoms) for _ in range(rnd.randint(0, 16)))
+        m = re.search(r"ssl_protocols?\s+([^;]+);", c)
+        assert (m.group(1) if m else None) == _first_nginx_value(c, _NGINX_PROTOCOLS, quoted=False), c
+        m = re.search(r"ssl_ciphers?\s+['\"]?([^;'\"]+)['\"]?\s*;", c)
+        assert (m.group(1) if m else None) == _first_nginx_value(c, _NGINX_CIPHERS, quoted=True), c
+
+
+@pytest.mark.parametrize("content", [
+    "server { listen 443 ssl; " + "ssl_protocol " * 600_000,
+    "ssl_ciphers '" * 600_000,
+    "bind " * 1_000_000 + "ssl",
+    ("bind :443 " + "ssl " * 1000 + "\n") * 2000,
+])
+def test_config_scans_are_linear(tmp_path, content):
+    import time
+
+    f = tmp_path / "nginx.conf"
+    f.write_text(content)
+    t0 = time.perf_counter()
+    result = ConfigParser().scan_file(str(f))
+    assert result.status.value == "success"
+    assert time.perf_counter() - t0 < 5.0
+
+
+def test_haproxy_bind_ciphers_handles_non_first_bind_token():
+    from src.scanner.config_parser import _haproxy_bind_ciphers
+
+    # A leading token like "bindx" must not hide the real "bind" after it.
+    assert list(_haproxy_bind_ciphers("bindx bind :443 ssl ciphers EVIL\n")) == ["EVIL"]
+    # Normal case still works; a line with no real bind yields nothing.
+    assert list(_haproxy_bind_ciphers("bind :443 ssl ciphers AAA:BBB\n")) == ["AAA:BBB"]
+    assert list(_haproxy_bind_ciphers("frontend ft ssl ciphers X\n")) == []

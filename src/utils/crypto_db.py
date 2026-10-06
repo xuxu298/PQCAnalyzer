@@ -26,6 +26,23 @@ class AlgorithmInfo:
     migration_priority: int
     note_vi: str
     note_en: str
+    # An RSA key both signs and transports keys, so its plain `replacement`
+    # names a KEM and a signature scheme. Callers that know which role the
+    # key plays ask replacement_for() instead.
+    replacement_kex: tuple[str, ...] = ()
+    replacement_sig: tuple[str, ...] = ()
+
+    def replacement_for(self, usage: str) -> list[str]:
+        """Replacement for the role the algorithm plays here.
+
+        ``usage`` is ``"key_exchange"`` or ``"signature"``; anything else, or
+        an entry without a role-specific list, gets the generic replacement.
+        """
+        if usage == "key_exchange" and self.replacement_kex:
+            return list(self.replacement_kex)
+        if usage == "signature" and self.replacement_sig:
+            return list(self.replacement_sig)
+        return list(self.replacement)
 
 
 class AlgorithmDatabase:
@@ -54,6 +71,8 @@ class AlgorithmDatabase:
                 migration_priority=info["migration_priority"],
                 note_vi=info["note_vi"],
                 note_en=info["note_en"],
+                replacement_kex=tuple(info.get("replacement_kex", ())),
+                replacement_sig=tuple(info.get("replacement_sig", ())),
             )
 
     @property
