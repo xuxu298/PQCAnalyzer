@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
+import contextlib
 import ssl
 import time
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -25,6 +27,29 @@ from src.utils.crypto_db import get_algorithm_db
 from src.utils.i18n import t
 
 logger = logging.getLogger(__name__)
+
+
+def inventory_context(
+    min_version: ssl.TLSVersion, max_version: ssl.TLSVersion
+) -> ssl.SSLContext:
+    """Client context that can still talk to legacy servers.
+
+    OpenSSL 3.x refuses TLS 1.0/1.1 (and small keys, SHA-1 handshakes) at the
+    default security level before a ClientHello is even sent, so a server that
+    has them enabled would look like it does not -- the HIGH "deprecated
+    protocol" finding would never fire. We are inventorying what the server
+    accepts, not trusting the session, so drop the security level for the probe.
+    """
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        ctx.minimum_version = min_version
+        ctx.maximum_version = max_version
+    with contextlib.suppress(ssl.SSLError):
+        ctx.set_ciphers("ALL:@SECLEVEL=0")
+    return ctx
 
 
 @dataclass
@@ -114,6 +139,46 @@ class TLSScanner:
             except (ssl.SSLError, ValueError):
                 pass
 
+        try:
+            self._handshake_extract(info, ctx, host, port, timeout_sec)
+        except ssl.SSLError:
+            # The default context refuses TLS 1.0/1.1 and weak keys, so a
+            # legacy-only server (or an RSA-1024 / TLS 1.0 cert) would surface
+            # as a scan error instead of the findings it deserves. Retry once
+            # permissively so the endpoint still gets inventoried.
+            info = TLSConnectionInfo()
+            self._handshake_extract(
+                info,
+                inventory_context(ssl.TLSVersion.TLSv1, ssl.TLSVersion.TLSv1_3),
+                host,
+                port,
+                timeout_sec,
+            )
+
+        # Probe for supported protocols
+        info.supported_protocols = self._probe_protocols(host, port, timeout_sec)
+
+        # If stdlib didn't surface a PQ hybrid group (Python <3.13 / OpenSSL
+        # <3.5 cannot offer X25519MLKEM768), do an active probe so we can
+        # still detect servers that support it.
+        if "MLKEM" in info.key_exchange.upper():
+            # stdlib handshake already negotiated PQ hybrid — the connection
+            # itself is proof the server supports it.
+            info.detection_mode = "active_supported"
+        else:
+            self._probe_pq_groups(info, host, port, timeout_sec)
+
+        return info
+
+    def _handshake_extract(
+        self,
+        info: TLSConnectionInfo,
+        ctx: ssl.SSLContext,
+        host: str,
+        port: int,
+        timeout_sec: float,
+    ) -> None:
+        """Run one handshake with *ctx* and fill the negotiated fields of *info*."""
         with socket.create_connection((host, port), timeout=timeout_sec) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 # Negotiated connection info
@@ -135,21 +200,6 @@ class TLSScanner:
                 self._parse_cipher_suite(info, negotiated_group)
 
                 info.cert_chain_der = self._peer_chain_der(ssock)
-
-        # Probe for supported protocols
-        info.supported_protocols = self._probe_protocols(host, port, timeout_sec)
-
-        # If stdlib didn't surface a PQ hybrid group (Python <3.13 / OpenSSL
-        # <3.5 cannot offer X25519MLKEM768), do an active probe so we can
-        # still detect servers that support it.
-        if "MLKEM" in info.key_exchange.upper():
-            # stdlib handshake already negotiated PQ hybrid — the connection
-            # itself is proof the server supports it.
-            info.detection_mode = "active_supported"
-        else:
-            self._probe_pq_groups(info, host, port, timeout_sec)
-
-        return info
 
     @staticmethod
     def _peer_chain_der(ssock: ssl.SSLSocket) -> list[bytes]:
@@ -227,7 +277,26 @@ class TLSScanner:
             info.key_exchange = "ECDHE"
         elif "DHE" in suite or "EDH" in suite:
             info.key_exchange = "DHE"
-        elif "RSA" in suite and "ECDHE" not in suite and "DHE" not in suite:
+        elif (
+            protocol
+            and suite
+            and "TLS1.3" not in protocol
+            and "TLS 1.3" not in protocol
+            and not any(
+                tag in suite
+                for tag in (
+                    "PSK", "SRP", "ADH", "AECDH", "ANON", "KRB",
+                    # Non-RSA key exchanges OpenSSL also names without "RSA":
+                    # don't mislabel them as RSA.
+                    "GOST", "ECCPWD", "DH-DSS",
+                )
+            )
+        ):
+            # OpenSSL names static-RSA suites without saying so
+            # ("AES256-SHA256", "DES-CBC3-SHA"): for TLS <=1.2 the absence of
+            # an (EC)DHE marker means the session key travels encrypted under
+            # the certificate's RSA key -- the worst HNDL case, no forward
+            # secrecy -- so it must still raise a key-exchange finding.
             info.key_exchange = "RSA"
         elif "TLS1.3" in protocol or "TLS 1.3" in protocol:
             # TLS 1.3 always uses (EC)DHE; cipher suite doesn't encode it.
@@ -283,11 +352,7 @@ class TLSScanner:
 
         for name, version in protocols_to_test:
             try:
-                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                ctx.minimum_version = version
-                ctx.maximum_version = version
+                ctx = inventory_context(version, version)
 
                 with socket.create_connection((host, port), timeout=timeout) as sock:
                     with ctx.wrap_socket(sock, server_hostname=host):
@@ -327,7 +392,7 @@ class TLSScanner:
                     risk_level=algo_info.risk_level,
                     quantum_vulnerable=algo_info.quantum_vulnerable,
                     location=f"{target}, {info.protocol_version} handshake",
-                    replacement=algo_info.replacement,
+                    replacement=algo_info.replacement_for("key_exchange"),
                     migration_priority=algo_info.migration_priority,
                     note=algo_info.note_en,
                     detection_mode=info.detection_mode or "passive",

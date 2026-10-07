@@ -521,7 +521,7 @@ class CertAnalyzer:
                 risk_level=risk,
                 quantum_vulnerable=algo_info.quantum_vulnerable,
                 location=location,
-                replacement=algo_info.replacement,
+                replacement=algo_info.replacement_for("signature"),
                 migration_priority=priority,
                 note=note,
             ))
@@ -540,7 +540,7 @@ class CertAnalyzer:
                 risk_level=risk,
                 quantum_vulnerable=sig_algo.quantum_vulnerable,
                 location=location,
-                replacement=sig_algo.replacement,
+                replacement=sig_algo.replacement_for("signature"),
                 migration_priority=priority,
                 note=note,
             ))

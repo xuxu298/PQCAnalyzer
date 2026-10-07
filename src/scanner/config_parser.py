@@ -14,6 +14,94 @@ from src.utils.i18n import t
 logger = logging.getLogger(__name__)
 
 
+# The value extraction below used regexes such as `ssl_protocols?\s+([^;]+);`
+# that scan to the end of the file for every occurrence without a match:
+# quadratic in the file size (260 KB of `ssl_protocol ` without `;` => 16 s,
+# 8 MB => hours). These helpers only ever move forward.
+
+_NGINX_PROTOCOLS = re.compile(r"ssl_protocols?\s+")
+_NGINX_CIPHERS = re.compile(r"ssl_ciphers?\s+")
+_QUOTE_OR_SEMI = re.compile(r"[;'\"]")
+_SEMI = re.compile(";")
+_HAPROXY_BIND = re.compile(r"\bbind\s")
+
+
+def _ws_before(content: str, end: int) -> int:
+    """Length of the whitespace run that ends at ``end``."""
+    i = end
+    while i > 0 and content[i - 1] in " \t\r\n\f\v":
+        i -= 1
+    return end - i
+
+
+def _first_nginx_value(content: str, directive: re.Pattern, quoted: bool) -> str | None:
+    """Value of the first `directive … ;` statement, exactly as the old
+    regexes read it (`ssl_protocols?\\s+([^;]+);` and
+    `ssl_ciphers?\\s+['"]?([^;'"]+)['"]?\\s*;`), in one forward pass.
+
+    The alternatives are tried in the regex's own order, including `\\s+`
+    giving one whitespace character back to the value when the run is longer
+    than one."""
+    n = len(content)
+    term = _QUOTE_OR_SEMI if quoted else _SEMI
+    nxt = [-1]   # position of the next terminator (only moves forward)
+
+    def next_term(start: int) -> int:
+        if nxt[0] < start:
+            hit = term.search(content, start)
+            nxt[0] = hit.start() if hit else n
+        return nxt[0]
+
+    def closes(i: int) -> bool:   # ['"]? \s* ;
+        if i < n and content[i] in "'\"":
+            i += 1
+        while i < n and content[i] in " \t\r\n\f\v":
+            i += 1
+        return i < n and content[i] == ";"
+
+    for m in directive.finditer(content):
+        pos = m.end()
+        give_back = _ws_before(content, pos) >= 2
+        start = pos + 1 if quoted and pos < n and content[pos] in "'\"" else pos
+        end = next_term(start)
+        if end >= n:
+            return None   # no terminator anywhere further on: nothing can match
+        if end > start and (not quoted or closes(end)):
+            return content[start:end]
+        # backtrack: one whitespace character becomes the value
+        if give_back and (closes(pos) if quoted else content[pos] == ";"):
+            return content[pos - 1]
+    return None
+
+
+def _has_ssl_bind(content: str) -> bool:
+    """A line with `bind` and, later on it, `ssl` (one pass per line)."""
+    for line in content.splitlines():
+        m = re.search(r"\bbind\b", line)
+        if m and re.search(r"\bssl\b", line[m.end():]):
+            return True
+    return False
+
+
+def _haproxy_bind_ciphers(content: str):
+    """`ciphers <list>` on `bind … ssl …` lines, one forward pass per line.
+
+    `bind` is matched as a word (`\\bbind\\s`), so a leading token such as
+    ``bindx`` does not hide a real ``bind`` after it. Everything is done with
+    index searches (no per-match slicing) to stay linear on huge lines.
+    """
+    for line in content.splitlines():
+        bm = _HAPROXY_BIND.search(line)
+        if not bm:
+            continue
+        ssl_at = line.find("ssl", bm.end())
+        if ssl_at < 0:
+            continue
+        words = line[ssl_at + 3:].split()
+        if "ciphers" in words[:-1]:
+            yield words[words.index("ciphers") + 1]
+
+
 class ConfigParser:
     """Parse server configuration files to extract cryptographic settings."""
 
@@ -81,7 +169,7 @@ class ConfigParser:
 
         if "haproxy" in fname:
             return "haproxy"
-        if re.search(r"\bbind\b.*\bssl\b", content):
+        if _has_ssl_bind(content):
             return "haproxy"
 
         return "unknown"
@@ -92,9 +180,9 @@ class ConfigParser:
         db = get_algorithm_db()
 
         # Extract ssl_protocols
-        proto_match = re.search(r"ssl_protocols?\s+([^;]+);", content)
-        if proto_match:
-            protocols = proto_match.group(1).strip().split()
+        proto_value = _first_nginx_value(content, _NGINX_PROTOCOLS, quoted=False)
+        if proto_value is not None:
+            protocols = proto_value.strip().split()
             for proto in protocols:
                 proto_clean = proto.strip()
                 if proto_clean.lower() in ("tlsv1", "tlsv1.0"):
@@ -132,9 +220,9 @@ class ConfigParser:
                     ))
 
         # Extract ssl_ciphers
-        cipher_match = re.search(r"ssl_ciphers?\s+['\"]?([^;'\"]+)['\"]?\s*;", content)
-        if cipher_match:
-            cipher_string = cipher_match.group(1).strip()
+        cipher_value = _first_nginx_value(content, _NGINX_CIPHERS, quoted=True)
+        if cipher_value is not None:
+            cipher_string = cipher_value.strip()
             cipher_findings = self._analyze_cipher_string(cipher_string, filepath, "nginx")
             findings.extend(cipher_findings)
 
@@ -190,11 +278,7 @@ class ConfigParser:
         findings: list[Finding] = []
 
         # bind ... ssl ... ciphers <list>
-        bind_matches = re.finditer(
-            r"bind\s+[^\n]*ssl[^\n]*ciphers\s+(\S+)", content
-        )
-        for match in bind_matches:
-            cipher_string = match.group(1)
+        for cipher_string in _haproxy_bind_ciphers(content):
             cipher_findings = self._analyze_cipher_string(
                 cipher_string, filepath, "haproxy"
             )

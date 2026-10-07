@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "last_updated": "2026-10-03",
+  "version": "1.2.0",
+  "last_updated": "2026-10-06",
   "changelog": [
     {
       "version": "1.0.0",
@@ -11,6 +11,11 @@
       "version": "1.1.0",
       "date": "2026-10-03",
       "changes": "Classical key exchange (ECDHE, X25519, X448, DHE-2048) raised to CRITICAL: it is the part HNDL attacks today. AES-128 lowered to LOW per NIST IR 8547. X25519Kyber768 (withdrawn draft) replaced by X25519MLKEM768 as the recommended hybrid."
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-10-06",
+      "changes": "RSA keys carry role-specific replacements (replacement_kex / replacement_sig): a certificate signature now points at ML-DSA only, key exchange at a KEM only, instead of the mixed KEM+signature list."
     }
   ],
   "algorithms": {
@@ -22,6 +27,8 @@
       "attack": "Shor's algorithm (also classically weak)",
       "estimated_break": "Already insecure classically",
       "replacement": ["ML-KEM-768", "ML-DSA-65"],
+      "replacement_kex": ["X25519MLKEM768", "ML-KEM-768"],
+      "replacement_sig": ["ML-DSA-65"],
       "migration_priority": 1,
       "note_vi": "Không an toàn cả với máy tính cổ điển. Phải thay ngay lập tức.",
       "note_en": "Insecure even classically. Must replace immediately."
@@ -34,6 +41,8 @@
       "attack": "Shor's algorithm",
       "estimated_break": "2030-2040 (CRQC)",
       "replacement": ["ML-KEM-768", "ML-DSA-65"],
+      "replacement_kex": ["X25519MLKEM768", "ML-KEM-768"],
+      "replacement_sig": ["ML-DSA-65"],
       "migration_priority": 1,
       "note_vi": "Phá vỡ hoàn toàn bởi thuật toán Shor. Cần chuyển đổi ngay.",
       "note_en": "Completely broken by Shor's algorithm. Migrate immediately."
@@ -46,6 +55,8 @@
       "attack": "Shor's algorithm",
       "estimated_break": "2030-2040 (CRQC)",
       "replacement": ["ML-KEM-768", "ML-DSA-65"],
+      "replacement_kex": ["X25519MLKEM768", "ML-KEM-768"],
+      "replacement_sig": ["ML-DSA-65"],
       "migration_priority": 1,
       "note_vi": "Key size lớn hơn không giúp chống Shor. Cần chuyển đổi.",
       "note_en": "Larger key size does not help against Shor. Must migrate."
@@ -58,6 +69,8 @@
       "attack": "Shor's algorithm",
       "estimated_break": "2030-2040 (CRQC)",
       "replacement": ["ML-KEM-1024", "ML-DSA-87"],
+      "replacement_kex": ["ML-KEM-1024"],
+      "replacement_sig": ["ML-DSA-87"],
       "migration_priority": 1,
       "note_vi": "RSA-4096 cũng bị phá bởi Shor. Cần chuyển sang PQC.",
       "note_en": "RSA-4096 also broken by Shor. Must migrate to PQC."

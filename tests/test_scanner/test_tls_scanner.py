@@ -30,9 +30,18 @@ class TestParseCipherSuiteTLS12:
         assert info.bulk_cipher == "ChaCha20-Poly1305"
 
     def test_static_rsa(self):
+        # OpenSSL's name for TLS_RSA_WITH_AES_256_CBC_SHA256: no (EC)DHE
+        # means RSA key transport -- the worst HNDL case, must be reported.
         info = _parse("AES256-SHA256", "TLSv1.2")
-        # No ECDHE/DHE in suite
-        assert info.key_exchange == ""
+        assert info.key_exchange == "RSA"
+        assert _parse("DES-CBC3-SHA", "TLSv1").key_exchange == "RSA"
+        assert _parse("PSK-AES128-CBC-SHA", "TLSv1.2").key_exchange == ""
+
+    def test_non_rsa_static_suites_not_mislabelled_rsa(self):
+        # Key exchanges OpenSSL also names without "RSA" must not be called RSA.
+        assert _parse("GOST2012-GOST8912-GOST8912", "TLSv1.2").key_exchange == ""
+        assert _parse("DH-DSS-AES256-SHA", "TLSv1.2").key_exchange == ""
+        assert _parse("ECCPWD-AES128-GCM-SHA256", "TLSv1.2").key_exchange == ""
 
     def test_dhe(self):
         info = _parse("DHE-RSA-AES128-GCM-SHA256", "TLSv1.2")
@@ -455,3 +464,121 @@ class TestChainRobustness:
                 return [der]
 
         assert TLSScanner._peer_chain_der(FakeSock()) == [der]
+
+
+def _legacy_server(tmp_path, min_version, max_version):
+    """Local TLS server that still accepts TLS 1.0/1.1."""
+    import socket
+    import ssl
+    import threading
+    import warnings
+
+    from cryptography.hazmat.primitives import serialization
+
+    key = _rsa_key()
+    der = _leaf_der(key, cn="localhost")
+    cert_pem = tmp_path / "c.pem"
+    key_pem = tmp_path / "k.pem"
+    cert_pem.write_text(ssl.DER_cert_to_PEM_cert(der))
+    key_pem.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ))
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        ctx.minimum_version = min_version
+        ctx.maximum_version = max_version
+    ctx.set_ciphers("ALL:@SECLEVEL=0")
+    ctx.load_cert_chain(cert_pem, key_pem)
+
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(16)
+    listener.settimeout(5)
+
+    def serve():
+        while True:
+            try:
+                conn, _ = listener.accept()
+            except OSError:
+                return
+            try:
+                with ctx.wrap_socket(conn, server_side=True) as tls:
+                    tls.recv(1)
+            except (ssl.SSLError, OSError):
+                pass
+
+    threading.Thread(target=serve, daemon=True).start()
+    return listener
+
+
+def _local_supports_tls10() -> bool:
+    import ssl
+
+    return ssl.HAS_TLSv1 and ssl.HAS_TLSv1_1
+
+
+@pytest.mark.skipif(not _local_supports_tls10(), reason="local OpenSSL built without TLS 1.0/1.1")
+class TestLegacyProtocolDetection:
+    """OpenSSL 3.x refused TLS 1.0/1.1 client-side, so servers that still
+    enable them were reported as not supporting them and the HIGH
+    'deprecated protocol' finding never fired."""
+
+    def _scan(self, listener):
+        from src.config import ScanConfig
+
+        port = listener.getsockname()[1]
+        scanner = TLSScanner(config=ScanConfig(timeout_ms=3000))
+        try:
+            return scanner._connect_and_extract("127.0.0.1", port)
+        finally:
+            listener.close()
+
+    def test_tls10_and_11_enabled_are_detected(self, tmp_path):
+        import ssl
+
+        info = self._scan(_legacy_server(tmp_path, ssl.TLSVersion.TLSv1, ssl.TLSVersion.TLSv1_2))
+        assert {"TLSv1.0", "TLSv1.1", "TLSv1.2"} <= set(info.supported_protocols)
+        assert info.protocol_version == "TLSv1.2"
+        findings = TLSScanner()._analyze(info, "127.0.0.1:443")
+        flagged = {f.algorithm for f in findings if f.component == TLSInfo.PROTOCOL}
+        assert {"TLSv1.0", "TLSv1.1"} <= flagged
+
+    def test_modern_server_reports_no_legacy(self, tmp_path):
+        import ssl
+
+        info = self._scan(_legacy_server(tmp_path, ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3))
+        assert "TLSv1.0" not in info.supported_protocols
+        assert "TLSv1.1" not in info.supported_protocols
+
+    def test_tls10_only_server_is_assessed_not_errored(self, tmp_path):
+        import ssl
+
+        info = self._scan(_legacy_server(tmp_path, ssl.TLSVersion.TLSv1, ssl.TLSVersion.TLSv1))
+        assert info.protocol_version == "TLSv1"
+        assert info.supported_protocols == ["TLSv1.0"]
+        assert info.cert_chain_der
+
+
+def test_rsa_certificate_findings_recommend_signatures_only():
+    """CERT_PUBLIC_KEY / CERT_SIGNATURE rows for an RSA leaf must not
+    recommend ML-KEM."""
+    from src.scanner.cert_analyzer import CertAnalyzer
+
+    analyzer = CertAnalyzer()
+    _, findings = analyzer.analyze_chain_bytes([_leaf_der(_rsa_key())], source="h.example:443")
+    cert_parts = {TLSInfo.CERT_PUBLIC_KEY, TLSInfo.CERT_SIGNATURE}
+    cert_rows = [f for f in findings if f.component in cert_parts]
+    assert {f.component for f in cert_rows} == cert_parts
+    for f in cert_rows:
+        assert f.replacement, f.component
+        assert not any("KEM" in r for r in f.replacement), (f.component, f.replacement)
+
+
+def test_static_rsa_key_exchange_recommends_kem_only():
+    info = TLSConnectionInfo(cipher_suite="AES256-SHA256", protocol_version="TLSv1.2")
+    TLSScanner()._parse_cipher_suite(info, None)
+    kex = [f for f in TLSScanner()._analyze(info, "h:443") if f.component == TLSInfo.KEY_EXCHANGE]
+    assert kex and not any("DSA" in r for r in kex[0].replacement), kex[0].replacement
