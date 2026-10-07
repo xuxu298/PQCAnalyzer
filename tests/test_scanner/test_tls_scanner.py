@@ -567,11 +567,14 @@ def test_rsa_certificate_findings_recommend_signatures_only():
     recommend ML-KEM."""
     from src.scanner.cert_analyzer import CertAnalyzer
 
-    _, findings = CertAnalyzer().analyze_chain_bytes([_leaf_der(_rsa_key())], source="h.example:443")
-    cert_rows = [f for f in findings if f.component in (TLSInfo.CERT_PUBLIC_KEY, TLSInfo.CERT_SIGNATURE)]
-    assert {f.component for f in cert_rows} == {TLSInfo.CERT_PUBLIC_KEY, TLSInfo.CERT_SIGNATURE}
+    analyzer = CertAnalyzer()
+    _, findings = analyzer.analyze_chain_bytes([_leaf_der(_rsa_key())], source="h.example:443")
+    cert_parts = {TLSInfo.CERT_PUBLIC_KEY, TLSInfo.CERT_SIGNATURE}
+    cert_rows = [f for f in findings if f.component in cert_parts]
+    assert {f.component for f in cert_rows} == cert_parts
     for f in cert_rows:
-        assert f.replacement and not any("KEM" in r for r in f.replacement), (f.component, f.replacement)
+        assert f.replacement, f.component
+        assert not any("KEM" in r for r in f.replacement), (f.component, f.replacement)
 
 
 def test_static_rsa_key_exchange_recommends_kem_only():

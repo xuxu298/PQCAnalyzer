@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
+import contextlib
 import ssl
 import time
 import warnings
@@ -46,10 +47,8 @@ def inventory_context(
         warnings.simplefilter("ignore", DeprecationWarning)
         ctx.minimum_version = min_version
         ctx.maximum_version = max_version
-    try:
+    with contextlib.suppress(ssl.SSLError):
         ctx.set_ciphers("ALL:@SECLEVEL=0")
-    except ssl.SSLError:
-        pass
     return ctx
 
 

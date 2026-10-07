@@ -90,7 +90,8 @@ def test_value_scans_match_the_old_regexes():
     for _ in range(30000):
         c = "".join(rnd.choice(atoms) for _ in range(rnd.randint(0, 16)))
         m = re.search(r"ssl_protocols?\s+([^;]+);", c)
-        assert (m.group(1) if m else None) == _first_nginx_value(c, _NGINX_PROTOCOLS, quoted=False), c
+        want = m.group(1) if m else None
+        assert want == _first_nginx_value(c, _NGINX_PROTOCOLS, quoted=False), c
         m = re.search(r"ssl_ciphers?\s+['\"]?([^;'\"]+)['\"]?\s*;", c)
         assert (m.group(1) if m else None) == _first_nginx_value(c, _NGINX_CIPHERS, quoted=True), c
 
